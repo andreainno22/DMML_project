@@ -1,31 +1,21 @@
+from get_mapping_dictionaries import get_mapping_dictionaries
+
+
 def decode_point(point_code):
     """
     Decodes the entire point code into a human-readable description.
     """
-    serve_directions = {'4': 'out wide', '5': 'body', '6': 'down the T', '0': 'unknown direction'}
-    fault_types = {'n': 'net', 'w': 'wide', 'd': 'deep', 'x': 'both wide and deep', 'g': 'foot fault',
-                   'e': 'unknown fault', '!': 'shank'}
-    serve_outcomes = {'*': 'ace', '#': 'forced error', '@': 'unforced error'}
-    shot_types = {
-        'f': 'forehand groundstroke', 'b': 'backhand groundstroke',
-        'r': 'forehand slice', 's': 'backhand slice',
-        'v': 'forehand volley', 'z': 'backhand volley',
-        'o': 'overhead/smash', 'p': 'backhand overhead/smash',
-        'u': 'forehand drop shot', 'y': 'backhand drop shot',
-        'l': 'forehand lob', 'm': 'backhand lob',
-        'h': 'forehand half-volley', 'i': 'backhand half-volley',
-        'j': 'forehand swinging volley', 'k': 'backhand swinging volley',
-        't': 'trick shot', 'q': 'unknown shot'
-    }
-    shot_depth = {'7': 'short depth', '8': 'medium depth', '9': 'near the baseline depth'}
-    court_positions = {"-": "near the net", "=": "from the baseline"}
-    shot_directions = {'1': 'cross court', '2': 'down the middle', '3': 'down the line',
-                       '0': 'unknown direction'}
-    error_types = {'n': 'net', 'w': 'wide', 'd': 'deep', 'x': 'both wide and deep', '!': 'shank', 'e': 'unknown'}
-    point_outcomes = {'*': 'winner', '#': 'forced error', '@': 'unforced error'}
-
     description = []
     i = 0
+    serve_directions = get_mapping_dictionaries("serve_directions")
+    fault_types = get_mapping_dictionaries("fault_types")
+    serve_outcomes = get_mapping_dictionaries("serve_outcomes")
+    shot_types = get_mapping_dictionaries("shot_types")
+    shot_depth = get_mapping_dictionaries("shot_depth")
+    court_positions = get_mapping_dictionaries("court_positions")
+    shot_directions = get_mapping_dictionaries("shot_directions")
+    error_types = get_mapping_dictionaries("error_types")
+    point_outcomes = get_mapping_dictionaries("point_outcomes")
 
     # Decode serve
     while i < len(point_code):
@@ -63,7 +53,7 @@ def decode_point(point_code):
                 i += 1
             if i + 1 < len(point_code) and point_code[i + 1] in error_types:
                 shot_desc += f" ({error_types[point_code[i + 1]]})"
-                if i + 2 < len(point_code) and point_code[i + 2] in serve_outcomes:
+                if i + 2 < len(point_code) and point_code[i + 2] in point_outcomes:
                     shot_desc += f" ({point_outcomes[point_code[i + 2]]})"
                     i += 2
                 else:
