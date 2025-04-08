@@ -15,6 +15,7 @@ def to_sequence(point_code):
     shot_directions = get_mapping_dictionaries("shot_directions")
     error_types = get_mapping_dictionaries("error_types")
     point_outcomes = get_mapping_dictionaries("point_outcomes")
+    unusual_situations = get_mapping_dictionaries("unusual_situations")
 
     serve = ""
     # detect the serve inside the rally
@@ -45,13 +46,19 @@ def to_sequence(point_code):
         shot = ""
         if char in shot_types:
             shot += char
+            if i + 1 < len(point_code) and (point_code[i + 1] in unusual_situations or point_code[
+                i + 1] in court_positions):
+                shot += point_code[i + 1]
+                i += 1
+            if i + 1 < len(point_code) and (point_code[i + 1] in court_positions or point_code[
+                i + 1] in unusual_situations):
+                shot += point_code[i + 1]
+                i += 1
             if i + 1 < len(point_code) and point_code[i + 1] in shot_directions:
                 shot += point_code[i + 1]
                 i += 1
-            if i + 1 < len(point_code) and point_code[i + 1] in court_positions:
-                shot += point_code[i + 1]
-                i += 1
-            if i + 1 < len(point_code) and point_code[i + 1] in shot_depth:
+            # aggiungo shot_depth solo alla risposta al servizio, lo ignoro altrimenti
+            if i + 1 < len(point_code) and point_code[i + 1] in shot_depth and len(list_of_shots) == 1:
                 shot += point_code[i + 1]
                 i += 1
             if i + 1 < len(point_code) and point_code[i + 1] in error_types:
@@ -61,7 +68,7 @@ def to_sequence(point_code):
                     i += 2
                 else:
                     i += 1
-            elif i + 1 < len(point_code) and point_code[i + 1] in point_outcomes: # a winner
+            elif i + 1 < len(point_code) and point_code[i + 1] in point_outcomes:  # a winner
                 shot += point_code[i + 1]
                 i += 1
             list_of_shots.append(shot)

@@ -40,9 +40,11 @@ def get_mapping_dictionaries(map_id):
     if map_id == "court_positions":
         return {"-": "near the net", "=": "from the baseline", "+": "net approach"}
     if map_id == "shot_directions":
-        return {'1': 'cross court', '2': 'down the middle', '3': 'down the line', '^': 'stop_volley',
+        return {'1': 'cross court', '2': 'down the middle', '3': 'down the line',
                 '0': 'unknown direction'}
     if map_id == "error_types":
         return {'n': 'net', 'w': 'wide', 'd': 'deep', 'x': 'both wide and deep', '!': 'shank', 'e': 'unknown'}
     if map_id == "point_outcomes":
         return {'*': 'winner', '#': 'forced error', '@': 'unforced error'}
+    if map_id == "unusual_situations":
+        return {'^': 'stop_volley', ';': "let touch"}
