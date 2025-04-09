@@ -30,7 +30,7 @@ def get_shots_in_2nd_serve_points(shots_df):
     # aggiunge un flag che indica se il punto è vinto dal player
     shots_sequence = pd.DataFrame({
         'shots': shots_sequence,
-        'won_by_player': shots_df['PtWinner']
+        'won_by_player': shots_df['PtWinner'] == 1
     })
 
     shots_sequence.dropna(subset=['shots'], inplace=True)

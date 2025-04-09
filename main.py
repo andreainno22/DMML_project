@@ -12,6 +12,12 @@ from get_shots import get_shots_in_1st_serve_points, get_shots_in_2nd_serve_poin
 from get_shots_wo_opponent_shots import get_shots_by_server, get_shots_by_receiver
 
 
+# Verifica che gli elementi di seq siano in x nello stesso ordine
+def is_subsequence(seq, x):
+    it = iter(x)
+    return all(item in it for item in seq)
+
+
 # todo: per trovare sequenze di colpi contigue, potrei semplicemente filtrare per punti di lunghezza n e poi impostare min length a n/2
 # todo: provare con punti di lunghezza diversa, con i punti piu lunghi abbassare il supporto
 def main():
@@ -51,15 +57,30 @@ def main():
     min_length = 3  # Lunghezza minima della sequenza
 
     # Trova tutte le sequenze frequenti
-    freq_shot_seqs_with_2nd = seqmining.freq_seq_enum(sinner_shots_1st_serve_response.shots, min_support=min_support)
+    freq_shot_seqs_1st_serve_response = seqmining.freq_seq_enum(sinner_shots_1st_serve_response.shots, min_support=min_support)
+
+    # Calcola la percentuale di vittoria per ogni sequenza frequente
+    results = []
+
+    sinner_shots_1st_serve_response['shots'] = sinner_shots_1st_serve_response['shots'].apply(tuple)
+
+    for seq, support in freq_shot_seqs_1st_serve_response:
+        # Filtra i punti in cui la sequenza appare
+        matches = sinner_shots_1st_serve_response[
+            sinner_shots_1st_serve_response['shots'].apply(lambda x: x if is_subsequence(seq, x) else None).notnull()
+        ]
+
+        # Calcola la percentuale di vittoria
+        win_percentage = matches['won_by_player'].mean() * 100  # Media dei valori booleani (True = 1, False = 0)
+
+        # Aggiungi la sequenza, il supporto e la percentuale di vittoria ai risultati
+        results.append((seq, support, win_percentage))
 
     # Filtra per lunghezza minima
-    filtered_seqs = [(seq, supp) for seq, supp in freq_shot_seqs_with_2nd if len(seq) >= min_length]
-
-    # una volta trovate le sequenze frequenti, ogni colpo che fa parte della sequenza vorrei avesse
-    # delle labels che indichino le sue posizioni all'interno dei punti (es quante volte è stato giocato
-    # nei primi 3, 6, 9 colpi e il conseguente tasso di vittoria del punto)
-    print("filtered sequence: ", filtered_seqs)
+    results = [(seq, support, win_percentage) for seq, support, win_percentage in results if len(seq) >= min_length]
+    # Stampa i risultati
+    for seq, support, win_percentage in results:
+        print(f"Sequenza: {seq}, Supporto: {support}, Percentuale di vittoria: {win_percentage:.2f}%")
 
 
 if __name__ == "__main__":
