@@ -26,7 +26,6 @@ def get_shots_in_2nd_serve_points(shots_df):
     # trasforma i punti in cui sinner è al servizio con la seconda in liste di colpi
     shots_sequence = shots_df_with_no_na['2nd'].apply(lambda x: to_sequence(x))
 
-    # todo: attenzione, verificare che won_by_player sia corretto!!! Probabilmente va aggiustato, a causa del concat
     # aggiunge un flag che indica se il punto è vinto dal player
     shots_sequence = pd.DataFrame({
         'shots': shots_sequence,
