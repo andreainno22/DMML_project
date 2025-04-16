@@ -18,10 +18,12 @@ def to_sequence(point_code):
     unusual_situations = get_mapping_dictionaries("unusual_situations")
 
     serve = ""
+    outcome = ""
+
     # detect the serve inside the rally
     char = point_code[0]
     if len(point_code) == 1:
-        return point_code
+        return point_code, ""
     serve += char  # serve direction
     if point_code[1] in serve_and_volley:
         serve += point_code[1]
@@ -62,16 +64,16 @@ def to_sequence(point_code):
                 shot += point_code[i + 1]
                 i += 1
             if i + 1 < len(point_code) and point_code[i + 1] in error_types:
-                shot += point_code[i + 1]
+                outcome += point_code[i + 1]
                 if i + 2 < len(point_code) and point_code[i + 2] in point_outcomes:
-                    shot += point_code[i + 2]
+                    outcome += point_code[i + 2]
                     i += 2
                 else:
                     i += 1
             elif i + 1 < len(point_code) and point_code[i + 1] in point_outcomes:  # a winner
-                shot += point_code[i + 1]
+                outcome = point_code[i + 1]
                 i += 1
             list_of_shots.append(shot)
         i += 1
 
-    return list_of_shots
+    return list_of_shots, outcome

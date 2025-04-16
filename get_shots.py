@@ -6,11 +6,13 @@ from to_seqeunce import to_sequence
 def get_shots_in_1st_serve_points(shots_df):
     # trasforma i punti in cui sinner è al servizio con la prima in liste di colpi
     shots_sequence = shots_df['1st'].apply(lambda x: to_sequence(x))
+    shots, outcome = zip(*shots_sequence)
 
     # aggiunge un flag che indica se il punto è vinto da player 1
     shots_sequence = pd.DataFrame({
-        'shots': shots_sequence,
-        'won_by_player': shots_df['PtWinner'] == 1
+        'shots': shots,
+        'won_by_player': shots_df['PtWinner'] == 1,
+        'outcome': outcome
     })
 
     # drop le righe in cui lo scambio non è partito (o ace, fault o errore in risposta)
@@ -25,11 +27,13 @@ def get_shots_in_2nd_serve_points(shots_df):
 
     # trasforma i punti in cui sinner è al servizio con la seconda in liste di colpi
     shots_sequence = shots_df_with_no_na['2nd'].apply(lambda x: to_sequence(x))
+    shots, outcome = zip(*shots_sequence)
 
     # aggiunge un flag che indica se il punto è vinto dal player
     shots_sequence = pd.DataFrame({
-        'shots': shots_sequence,
-        'won_by_player': shots_df['PtWinner'] == 1
+        'shots': shots,
+        'won_by_player': shots_df_with_no_na['PtWinner'] == 1
+        , 'outcome': outcome
     })
 
     shots_sequence.dropna(subset=['shots'], inplace=True)
