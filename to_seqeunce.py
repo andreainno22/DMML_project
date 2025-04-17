@@ -64,7 +64,7 @@ def to_sequence(point_code):
                 shot += point_code[i + 1]
                 i += 1
             if i + 1 < len(point_code) and point_code[i + 1] in error_types:
-                outcome += point_code[i + 1]
+                # il codice dell'error type non viene aggiunto all' outcome perchè non utile nell'analisi
                 if i + 2 < len(point_code) and point_code[i + 2] in point_outcomes:
                     outcome += point_code[i + 2]
                     i += 2

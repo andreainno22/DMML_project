@@ -37,9 +37,6 @@ def get_service_points_df(player, df, surface):
     player_at_service_as_2nd.loc[:, 'PtWinner'] = player_at_service_as_2nd['PtWinner'].apply(
         lambda x: 1 if x == 2 else 0)
 
-    # Stampa di debug per verificare i valori di 'PtWinner'
-    print("pt winner: ", player_at_service_as_2nd['PtWinner'])
-
     # Unisce i due DataFrame (1st player e 2nd player) e restituisce il risultato
     return pd.concat([player_at_service_as_1st, player_at_service_as_2nd])
 

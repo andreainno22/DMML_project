@@ -12,8 +12,8 @@ def get_freq_shots_seqs(shots):
     Count the frequency of each shot sequence in the list of shots.
     """
 
-    min_support = len(shots["shots"])*0.1  # Supporto minimo per le sequenze frequenti
-    min_length = 2  # Lunghezza minima della sequenza
+    min_support = len(shots["shots"]) * 0.05  # Supporto minimo per le sequenze frequenti
+    min_length = 3  # Lunghezza minima della sequenza
 
     # Trova tutte le sequenze frequenti
     freq_shots_seqs = seqmining.freq_seq_enum(shots.shots, min_support=min_support)
@@ -35,7 +35,8 @@ def get_freq_shots_seqs(shots):
         results.append((seq, support, win_percentage, most_frequent_outcome))
 
     # Filtra per lunghezza minima
-    results = [(seq, support, win_percentage, most_frequent_outcome) for seq, support, win_percentage, most_frequent_outcome in results if len(seq) >= min_length]
+    results = [(seq, support, win_percentage, most_frequent_outcome) for
+               seq, support, win_percentage, most_frequent_outcome in results if len(seq) >= min_length]
     # Stampa i risultati
     for result in results:
         yield result

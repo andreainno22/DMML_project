@@ -1,5 +1,5 @@
 import pandas as pd
-
+import numpy as np
 from to_seqeunce import to_sequence
 
 
@@ -12,7 +12,7 @@ def get_shots_in_1st_serve_points(shots_df):
     shots_sequence = pd.DataFrame({
         'shots': shots,
         'won_by_player': shots_df['PtWinner'] == 1,
-        'outcome': outcome
+        'outcome': np.where(shots_df['PtWinner'] == 1, [o + ", won" for o in outcome], [o + ", lost" for o in outcome])
     })
 
     # drop le righe in cui lo scambio non è partito (o ace, fault o errore in risposta)
@@ -32,8 +32,9 @@ def get_shots_in_2nd_serve_points(shots_df):
     # aggiunge un flag che indica se il punto è vinto dal player
     shots_sequence = pd.DataFrame({
         'shots': shots,
-        'won_by_player': shots_df_with_no_na['PtWinner'] == 1
-        , 'outcome': outcome
+        'won_by_player': shots_df_with_no_na['PtWinner'] == 1,
+        'outcome': np.where(shots_df_with_no_na['PtWinner'] == 1, [o + ", won" for o in outcome],
+                            [o + ", lost" for o in outcome])
     })
 
     shots_sequence.dropna(subset=['shots'], inplace=True)

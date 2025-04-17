@@ -33,8 +33,12 @@ def main():
         # estraggo il dataframe con i punti in cui sinner è in risposta
         player_on_response = get_response_points_df(player, df, surface)
 
+        # estraggo i punti in cui il giocatore è al servizio e ne ricavo i primi SHOT_LENGTH colpi
         player_shots_1st_service = get_shots_by_server(get_shots_in_1st_serve_points(player_on_service))
-        player_shots_1st_service = player_shots_1st_service[player_shots_1st_service['shots'].apply(len) == SHOT_LENGTH]
+
+        # prima di estrarre i primi SHOT_LENGTH colpi, verifico che il punto sia lungo almeno SHOT_LENGTH colpi
+        player_shots_1st_service = player_shots_1st_service[player_shots_1st_service['shots'].apply(len) >= SHOT_LENGTH]
+        player_shots_1st_service["shots"] = player_shots_1st_service['shots'].apply(lambda x: x[:SHOT_LENGTH])
 
         player_shots_2nd_service = get_shots_by_server(get_shots_in_2nd_serve_points(player_on_service))
         player_shots_2nd_service = player_shots_2nd_service[player_shots_2nd_service['shots'].apply(len) == SHOT_LENGTH]
