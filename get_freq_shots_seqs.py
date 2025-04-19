@@ -12,7 +12,7 @@ def get_freq_shots_seqs(shots):
     Count the frequency of each shot sequence in the list of shots.
     """
 
-    min_support = len(shots["shots"]) * 0.01  # Supporto minimo per le sequenze frequenti
+    min_support = len(shots["shots"]) * 0.005  # Supporto minimo per le sequenze frequenti
     min_length = 3  # Lunghezza minima della sequenza
 
     # Trova tutte le sequenze frequenti

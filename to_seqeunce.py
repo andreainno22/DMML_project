@@ -61,7 +61,8 @@ def to_sequence(point_code):
                 i += 1
             # aggiungo shot_depth solo alla risposta al servizio, lo ignoro altrimenti
             if i + 1 < len(point_code) and point_code[i + 1] in shot_depth and len(list_of_shots) == 1:
-                shot += point_code[i + 1]
+                # ignora la profondità della risposta al servizio
+                #shot += point_code[i + 1]
                 i += 1
             if i + 1 < len(point_code) and point_code[i + 1] in error_types:
                 # il codice dell'error type non viene aggiunto all' outcome perchè non utile nell'analisi
