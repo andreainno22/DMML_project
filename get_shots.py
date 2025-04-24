@@ -4,7 +4,7 @@ from to_seqeunce import to_sequence
 
 
 def get_shots_in_1st_serve_points(shots_df):
-    # trasforma i punti in cui sinner è al servizio con la prima in liste di colpi
+    # trasforma i punti in cui player è al servizio con la prima in liste di colpi
     shots_sequence = shots_df['1st'].apply(lambda x: to_sequence(x))
     shots, outcome = zip(*shots_sequence)
 

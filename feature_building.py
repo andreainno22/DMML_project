@@ -1,71 +1,73 @@
 import numpy as np
 import pandas as pd
-from costants import SURFACE
 
 
 # todo: cambiare il dataset e fare wide encoding con info di contesto
+# todo: integrale le feature generali: surface con + perc di vittoria, lunghezza media dei colpi, direzione preferita al servizio
+# todo: slice, dropshot vanno considerati in generale e non nei pattern, perchè rischiano di non apparire nei top patterns
 def extract_aggregated_features(patterns_list):
     """
     Estrae feature numeriche aggregate da una lista di pattern frequenti.
-    Ora include anche % drop shot e % slice.
+    Include percentuali PONDERATE (in base al supporto) di:
+    forehand, backhand, volley, drop shot, slice, e colpi profondi.
     """
-    from get_mapping_dictionaries import get_mapping_dictionaries
-
-    shot_types_map = get_mapping_dictionaries("shot_types")
-    shot_depth_map = get_mapping_dictionaries("shot_depth")
+    import numpy as np
 
     if not patterns_list:
         return np.zeros(9)
 
     wins = []
     supports = []
-    total_shots = 0
-    n_forehand = n_backhand = n_volley = 0
-    n_deep = 0
-    n_dropshot = 0
-    n_slice = 0
-    n_out_wides = 0
-    n_body = 0
-    n_down_the_T = 0
+    total_weighted_shots = 0
+
+    # Pesati per supporto
+    f_count = b_count = v_count = drop_count = slice_count = deep_count = 0
 
     for seq, support, win, _ in patterns_list:
         wins.append(win)
         supports.append(support)
 
         for shot in seq:
-
+            if len(shot) < 1:
+                continue
             shot_type = shot[0]
+            # shot depth non viene considerato, pensare se usarlo solo per la risposta al servizio
+            # shot_depth = shot[2] if len(shot) > 2 else None
 
-            total_shots += 1
+            total_weighted_shots += support  # ogni colpo pesato per ricorrenza
 
-            if shot_type in '4':  # serve
-                n_out_wides += 1
-            elif shot_type in '5':
-                n_body += 1
-            elif shot_type in '6':
-                n_down_the_T += 1
-            # Tipo colpo
-            if shot_type in ['f', 'r', 'l', 'u', 'h', 'j']:  # forehand e varianti
-                n_forehand += 1
-            elif shot_type in ['b', 's', 'm', 'y', 'i', 'k']:  # backhand e varianti
-                n_backhand += 1
-            if shot_type in ['v', 'z']:  # volley
-                n_volley += 1
-            if shot_type in ['u', 'y']:  # drop shots
-                n_dropshot += 1
-            if shot_type in ['r', 's']:  # slice
-                n_slice += 1
+            # Forehand e backhand (con varianti)
+            if shot_type in ['f', 'r', 'l', 'u', 'h', 'j']:
+                f_count += support
+            elif shot_type in ['b', 's', 'm', 'y', 'i', 'k']:
+                b_count += support
+
+            # Volley
+            if shot_type in ['v', 'z']:
+                v_count += support
+
+            # Drop shot
+            if shot_type in ['u', 'y']:
+                drop_count += support
+
+            # Slice
+            if shot_type in ['r', 's']:
+                slice_count += support
+
+    # Evita divisione per 0
+    if total_weighted_shots == 0:
+        return np.zeros(9)
 
     return np.array([
-        np.mean(wins),
-        n_backhand / total_shots if total_shots else 0,
-        n_forehand / total_shots if total_shots else 0,
-        n_volley / total_shots if total_shots else 0,
-        n_dropshot / total_shots if total_shots else 0,
-        n_slice / total_shots if total_shots else 0,
-        n_deep / total_shots if total_shots else 0,
-        len(patterns_list),  # varietà dei pattern
-        np.mean(supports)  # supporto medio
+        # feature inutile il numero medio di vittorie
+        # np.mean(wins),
+        b_count / total_weighted_shots,
+        f_count / total_weighted_shots,
+        v_count / total_weighted_shots,
+        drop_count / total_weighted_shots,
+        slice_count / total_weighted_shots,
+        len(patterns_list),
+        np.mean(supports)
     ])
 
 
@@ -85,8 +87,8 @@ def build_final_dataset(top_patterns, pattern_counts_by_context, all_pattern_lis
         for context, pattern_list in pattern_dict.items():
             # --- parsing delle info di contesto
             player = context.split()[0]
-            context_type = " ".join(context.split()[1:-2])  # es: on serve with the 1st
-            surface = SURFACE  # usa la variabile globale
+            context_type = " ".join(context.split()[1:-1])  # es: on serve with the 1st
+            surface = context.split()[-1]  # usa la variabile globale
             phase = "opening"  # per ora fissa, può diventare parametro in futuro
 
             # --- estrazione feature
@@ -98,15 +100,13 @@ def build_final_dataset(top_patterns, pattern_counts_by_context, all_pattern_lis
                 "point_type": context_type,
                 "surface": surface,
                 "phase": phase,
-                "avg_win_rate": agg_features[0],
-                "%backhand": agg_features[1],
-                "%forehand": agg_features[2],
-                "%volley": agg_features[3],
-                "%drop_shot": agg_features[4],
-                "%slice": agg_features[5],
-                "%deep_shots": agg_features[6],
-                "pattern_variety": agg_features[7],
-                "avg_support": agg_features[8],
+                "%backhand": agg_features[0],
+                "%forehand": agg_features[1],
+                "%volley": agg_features[2],
+                "%drop_shot": agg_features[3],
+                "%slice": agg_features[4],
+                "pattern_variety": agg_features[5],
+                "avg_support": agg_features[6],
             }
 
             # Aggiungi le feature dei pattern (una colonna per ciascuno)
