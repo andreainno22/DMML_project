@@ -28,13 +28,19 @@ def to_sequence(point_code):
     if point_code[1] in serve_and_volley:
         serve += point_code[1]
         if 2 < len(point_code) and point_code[2] in serve_outcomes or point_code[2] in fault_types:
-            serve += point_code[2]
-            start_rally_index = 3
+            # allora il punto non è proseguito, posso ritornare il servizio
+            outcome += point_code[2]
+            return serve, outcome
+            # serve += point_code[2]
+            # start_rally_index = 3
         else:
             start_rally_index = 2
     elif point_code[1] in serve_outcomes or point_code[1] in fault_types:
-        serve += point_code[1]
-        start_rally_index = 2
+        #allora il punto non è proseguito, posso ritornare il servizio
+        outcome += point_code[1]
+        return serve, outcome
+        # serve += point_code[1]
+        # start_rally_index = 2
     else:
         start_rally_index = 1
 
@@ -62,7 +68,7 @@ def to_sequence(point_code):
             # aggiungo shot_depth solo alla risposta al servizio, lo ignoro altrimenti
             if i + 1 < len(point_code) and point_code[i + 1] in shot_depth and len(list_of_shots) == 1:
                 # ignora la profondità della risposta al servizio
-                #shot += point_code[i + 1]
+                # shot += point_code[i + 1]
                 i += 1
             if i + 1 < len(point_code) and point_code[i + 1] in error_types:
                 # il codice dell'error type non viene aggiunto all' outcome perchè non utile nell'analisi

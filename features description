@@ -1,0 +1,139 @@
+🟨 1. General Match Stats (Global Tactical Indicators)
+Feature calcolate sul dataset completo del contesto, per ogni giocatore.
+
+Feature	               Tipo	    Descrizione
+avg_ace_rate	       float	% di ace su totale dei punti al servizio
+net_approach_rate	   float	% punti giocati a rete
+net_point_won_rate	   float	% di punti vinti a rete
+unforced_error_rate	   float	Errori non forzati / totale punti giocati
+winner_rate            float    vincenti / totale punti giocati
+slice_rate             float    % slice giocati
+dropshot_rate          float    % dropshot giocati
+avg_shot_length        float    media di lunghezza dei colpi
+deep_ret_avg           float    profondità media in risposta (in contesti con risposta)
+crosscourt_rate        float    % colpi incrociati
+down_the_line_rate     float    % colpi lungo linea
+middle_rate            float    % colpi nel mezzo del campo
+
+
+🟩 2. Positional Shot-Type Features (Full Dataset)
+Calcolate su tutti i punti giocati nel contesto
+→ Indicatore robusto dello stile generale.
+
+Feature	                 Tipo	 Descrizione
+%_forehand_as_1st_shot	 float	 Frequenza del dritto come primo colpo
+%_backhand_as_1st_shot	 float	 Frequenza del rovescio come primo colpo
+%_forehand_as_2nd_shot	 float	 ...
+...	...	... (ripetuto per 2°, 3° colpo)
+
+📌 Totale: 6 feature principali (3 posizioni × 2 shot-type)
+(eventualmente estensibile a slice, volley, ecc.)
+
+
+🟦 3. Positional Pattern-Based Features (Frequent Patterns Only)
+Calcolate solo sui pattern frequenti del giocatore nel contesto,
+con pesatura per supporto (opzionale ma consigliata).
+
+Feature	                            Tipo	Descrizione
+%_forehand_as_1st_shot_in_patterns	float	Percentuale ponderata del dritto come primo colpo
+%_backhand_as_1st_shot_in_patterns	float	...
+%_forehand_as_2nd_shot_in_patterns	float	...
+...	...	...
+📌 Stesso schema della sezione 2, ma solo su subset pattern
+📌 Facoltativamente normalizzate su supporto totale dei pattern
+
+
+🟪 4. Bag-of-Patterns (BoP)
+Vettore numerico per i Top-K pattern più diffusi nel contesto,
+calcolato per ciascun giocatore.
+
+Feature	                       Tipo	        Descrizione
+pattern_<id>_count	           int/float	Conteggio di quante volte il pattern è stato giocato
+pattern_<id>_frequency_norm	   float	    Frequenza normalizzata sul numero di punti validi
+
+📌 Solo per i top-N pattern globali del contesto (es. top 10–20)
+📌 Opzionale: normalizzazione sulla lunghezza del dataset del giocatore
+📌 Rappresentazione sparse, ma stilisticamente molto potente
+
+
+📦 Totale Feature per record (stimato)
+
+Gruppo	                    N. Feature (circa)
+General match stats	        5
+Positional (full dataset)	6–12
+Positional (patterns)	    6–12
+Bag-of-patterns (top N)	    10–20
+Totale stimato	            30–50
+
+
+POSSIBILI PROBLEMATICHE:
+1. Overlap tra feature posizionali globali e pattern-based
+Criticità: rischi di introdurre ridondanza tra:
+
+% forehand as 1st shot (global)
+
+% forehand as 1st shot in patterns
+
+🎯 Suggerimento:
+Calcola la correlazione tra questi gruppi prima di includerli entrambi.
+Se sono troppo simili, potresti tenere solo quelli globali per il clustering, e usare quelli sui pattern per l’analisi descrittiva.
+
+2. Le BoP sono feature sparse
+Criticità:
+I vettori Bag-of-Patterns sono spesso molto sparsi (molti zeri),
+e aumentano rapidamente la dimensione del dataset, influenzando negativamente la distanza tra record nei clustering (→ “curse of dimensionality”).
+
+🎯 Suggerimento:
+
+Limita i BoP a pochi pattern veramente diffusi (es. top 10 o top 15 nel contesto)
+
+Normalizzali (es. TF-like, frequenza relativa)
+
+Valuta un test con e senza BoP per confrontare la stabilità dei cluster
+
+
+4. Unforced error rate → attenzione alla variabilità
+Criticità:
+Dipende molto dal contesto del punto e dalla durata. In giocatori che giocano punti corti, può non essere significativo.
+
+🎯 Suggerimento:
+
+Calcola il valore solo nei punti con ≥ 3 colpi
+
+Oppure normalizzalo per shot count medio
+
+5. Shot-type categories troppo binarie?
+Criticità:
+Se consideri solo "forehand" e "backhand", stai perdendo informazioni tecniche importanti, come:
+
+slice vs top spin
+
+groundstroke vs volley
+
+🎯 Suggerimento (opzionale):
+
+Se vuoi raffinare, puoi creare super categorie:
+
+forehand_ground, backhand_slice, forehand_volley, ecc.
+
+Oppure aggiungere una 3ª categoria: net_shot (include volley, smash, ecc.)
+
+6. Normalizzazione delle feature
+Criticità:
+Alcune feature sono percentuali, altre conteggi, altre supporti…
+→ Se non normalizzi correttamente, pesano in modo sproporzionato nel clustering.
+
+🎯 Suggerimento:
+
+Scala tutto con StandardScaler o MinMaxScaler
+
+Valuta anche un clustering con PCA pre-clustering per ridurre l’impatto della dimensionalità
+
+🧠 Bonus idea: Feature derivata di coerenza
+Calcola una feature tipo:
+
+python
+Copia
+Modifica
+consistency = abs(% forehand as 1st shot global - % forehand as 1st shot in patterns)
+→ Quanto uno stile è replicato nei pattern ricorrenti?

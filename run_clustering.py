@@ -3,7 +3,7 @@ from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
 
-
+#todo: standardizzare e normalizzare tutte le features
 def run_clustering(df, n_clusters=3, visualize=True):
     """
     Applica clustering KMeans al DataFrame df con n_clusters specificato.

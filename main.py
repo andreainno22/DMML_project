@@ -15,6 +15,7 @@ from get_shots_wo_opponent_shots import get_shots_by_server, get_shots_by_receiv
 from run_clustering import run_clustering
 
 #todo: problema, per avere pattern giocati da tutti i giocatori devo abbassare parecchio il minsup, allora perde di significato
+# todo: sennò potrei trovare i pattern frequenti per ogni giocatore, tutti della stessa lunghezza, poi posso calcolare nuove feature come: %forehand come primo colpo, %backhand come secondo colpo, etc
 
 def main():
     """
