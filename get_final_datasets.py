@@ -59,7 +59,9 @@ def get_pattern_dictionary(df):
             # costruisce le features generiche a partire da tutti i punti con lunghezza
             generic_features = build_generic_features(context, shots)
             opening_phase_features = build_opening_phase_features(context, filtered_shots)
-    return build_pattern_vocabulary(all_pattern_lists)
+
+    return build_final_dataset(generic_features, opening_phase_features)
+    #return build_pattern_vocabulary(all_pattern_lists)
 
 
 from collections import Counter, defaultdict
@@ -75,8 +77,6 @@ def build_pattern_vocabulary(all_pattern_lists):
         pattern_counts_by_context: dizionario {context: [count vettore]}
         build_final_dataset(...) → dataset finale con BoP per ciascun contesto
     """
-
-    from collections import defaultdict, Counter
 
     context_pattern_counter = {}  # {context: Counter(pattern: support)}
     pattern_player_set_per_context = defaultdict(lambda: defaultdict(set))  # {context: {pattern: {players}}}

@@ -1,10 +1,8 @@
 import numpy as np
 import pandas as pd
+from collections import Counter
 
-
-# todo: cambiare il dataset e fare wide encoding con info di contesto
-# todo: integrale le feature generali: surface con + perc di vittoria, lunghezza media dei colpi, direzione preferita al servizio
-# todo: slice, dropshot vanno considerati in generale e non nei pattern, perchè rischiano di non apparire nei top patterns
+# todo: modificare extract_aggregated_features, o eliminare o aggiungere solo bag of patterns
 def extract_aggregated_features(patterns_list):
     """
     Estrae feature numeriche aggregate da una lista di pattern frequenti.
@@ -71,7 +69,6 @@ def extract_aggregated_features(patterns_list):
 
 
 def build_generic_features(context, shots):
-    # todo: finire di definire le feature generali, controllare se sono corrette o no
     total_points = shots.shape[0]
     volley_codes = {'v', 'z', 'o', 'p', 'h', 'i', 'j'}
     not_volley_codes = {'f', 'b', 's', 'r', 'u', 'y'}
@@ -84,9 +81,9 @@ def build_generic_features(context, shots):
         # se len = 1 vuol dire che c'è stato o un ace o un doppio fallo, senza tentativo di risposta
         total_points_with_return = shots[shots['shots'].apply(len) > 1].shape[0]
         # numero di colpi totale escludendo il servizio
-        total_no_service_shots = shots['shots'].apply(lambda seq: max(0, len(seq) - 1)).sum()
+        total_no_service_shots = shots['shots'].apply(lambda seq: len(seq) - 1).sum()
         # conta gli ace
-        ace_num = shots[(shots['shots'].apply(len) == 1) & (shots['outcome'] == '*')].shape[0]
+        ace_num = shots[(shots['shots'].apply(len) == 1) & (shots['outcome'].str.contains(r'\*', regex=True))].copy().shape[0]
         ace_rate = ace_num / total_points
     else:
         # se len <= 1 vuol dire che c'è stato solo servizio e risposta o solo servizio
@@ -100,21 +97,18 @@ def build_generic_features(context, shots):
         # 2. Filtra i punti con almeno una risposta (lunghezza > 0)
         points_with_returns = shots[shots['shots'].apply(len) > 0].copy()  # Usa .copy() per sicurezza
 
-        # 3. & 4. Estrai il secondo colpo e mappa al valore di profondità
-        def get_numeric_depth(sequence):
-            """Estrae il codice del secondo colpo e lo mappa a un valore numerico."""
-            if len(sequence) > 0:
-                if sequence[0][2] in shot_depth_map.keys():
-                    second_shot_code = sequence[0][2]  # Indice 0 per il primo colpo (risposta)
-                    # Usa .get() per ottenere il valore dalla mappa, restituendo None se il codice non c'è
-                    return shot_depth_map.get(second_shot_code, None)
-                else:
-                    return None
-            return None  # Non dovrebbe accadere per come ho filtrato, ma è sicuro
-
         # Applica la funzione per creare una nuova colonna con i valori di profondità
         # .loc per assegnare alla copia 'points_with_returns'
-        points_with_returns.loc[:, 'return_depth_value'] = points_with_returns['shots'].apply(get_numeric_depth)
+        points_with_returns.loc[:, 'return_depth_value'] = points_with_returns['shots'].apply(
+            lambda seq: next(
+                # Cerca il valore corrispondente al primo codice di profondità trovato...
+                (shot_depth_map[code] for code in shot_depth_map if code in seq[0]),
+                # ...restituisci None se nessun codice viene trovato nel primo colpo
+                None
+            )
+            # Esegui quanto sopra solo se la sequenza non è vuota, altrimenti restituisci None
+            if len(seq) > 0 else None
+        )
 
         # 5. Calcola la media dei valori di profondità validi
         # .mean() ignora automaticamente i valori NaN/None
@@ -122,45 +116,38 @@ def build_generic_features(context, shots):
 
     avg_shot_length = shots['shots'].apply(len).mean()
 
+    # numero di punti con discesa a rete
     total_volley_points = shots[
         shots['shots'].apply(lambda sequence:
-                             # Condizione 1: C'è almeno un codice volley nella sequenza?
-                             (any(code in sequence for code in volley_codes) and
-                              # Condizione 2: Il carattere '-' NON è presente nella sequenza?
-                              '-' not in sequence
-                              ) or
-                             # oppure il punto è non volley
-                             (any(code in sequence for code in not_volley_codes) and
-                              # ma giocato a rete
-                              '=' not in sequence))
+                             any(code in shot and '=' not in shot for shot in sequence for code in volley_codes) or
+                             any(code in shot and '-' in shot for shot in sequence for code in not_volley_codes)
+                             )
     ].shape[0]
     net_points_rate = total_volley_points / total_points_started
 
-    net_points_won = shots[(shots['PtWinner'] == 1) &
+    # numero di punti vinti dopo essere stato a rete almeno una vota durante lo scambio
+    net_points_won = shots[(shots['won_by_player'] is True) &
                            (shots['shots'].apply(lambda sequence:
-                                                 # Condizione 1: C'è almeno un codice volley nella sequenza?
-                                                 (any(code in sequence for code in
-                                                      volley_codes) and
-                                                  # Condizione 2: Il carattere '-' NON è presente nella sequenza?
-                                                  '-' not in sequence
-                                                  ) or
-                                                 # oppure il punto è non volley
-                                                 (any(code in sequence for code in
-                                                      not_volley_codes) and
-                                                  # ma giocato a rete
-                                                  '=' not in sequence))
-                            )].shape[0]
-    net_points_won_rate = net_points_won / total_volley_points
+                                                 any(code in shot and '=' not in shot for shot in sequence for code in
+                                                     volley_codes) or
+                                                 any(code in shot and '-' in shot for shot in sequence for code in
+                                                     not_volley_codes)
+                                                 ))].shape[0]
+    if total_volley_points != 0:
+        net_points_won_rate = net_points_won / total_volley_points
+    else:
+        net_points_won_rate = 0
 
     # escludo dai total points quelli per cui non c'è stata risposta
-    winners = shots[(shots['PtWinner'] == 1) & (shots['outcome'] == '*') & (len(shots['shots']) > 1)].shape[0]
+    winners = shots[(shots['won_by_player'] is True) & (shots['outcome'].str.contains(r'\*', regex=True)) & (len(shots['shots']) > 1)].shape[0]
     winners_rate = winners / total_points_with_return
 
     # escludo dai total points quelli per cui non c'è stata risposta
     unforced_errors_rate = \
-        shots[(shots['shots'].apply(len) > 1) & (shots['outcome'] == '#') & (shots['PtWinner'] == 0)].shape[
+        shots[(shots['shots'].apply(len) > 1) & (shots['outcome'].str.contains(r'\#', regex=True)) & (shots['won_by_player'] is False)].shape[
             0] / total_points_with_return
 
+    # percentuale di slice su colpi totali
     per_sequence_shots_with_slice = shots['shots'].apply(
         lambda list_of_shots: sum(any(code in shot for code in slice_codes)
                                   for shot in list_of_shots))
@@ -188,54 +175,99 @@ def build_generic_features(context, shots):
     dt_line = per_sequence_shots_with_dt_line.sum()
     dt_line_rate = dt_line / total_no_service_shots
 
+    generic_features = {'average_shot_length': avg_shot_length, 'net_points_rate': net_points_rate,
+            'net_points_won_rate': net_points_won_rate, 'winners_rate': winners_rate,
+            'unforced_errors_rate': unforced_errors_rate, 'slices_rate': slices_rate,
+            'dropshots_rate': dropshots_rate, 'crosscourt_rate': crosscourt_rate,
+            'middlecourt_rate': middle_rate, 'down_the_line_rate': dt_line_rate}
+
+    if str.__contains__(context, "on serve"):
+        return generic_features | {'ace_rate': ace_rate}
+    else:
+        return generic_features | {'average_response_depth': avg_resp_depth}
+
 
 def build_opening_phase_features(context, filtered_shots):
-    pass
-
-
-def build_final_dataset(top_patterns, pattern_counts_by_context, all_pattern_lists):
     """
-    Costruisce il DataFrame finale per il clustering, unendo:
-    - feature aggregate
-    - frequenze dei top pattern
-    - informazioni su giocatore, contesto, superficie, fase del punto
-
-    Returns:
-        pd.DataFrame con una riga per ogni (player + context), pronto per il clustering.
+    Estrae feature sulle categorie di colpi nei primi 3 colpi della sequenza.
+    Macro-categorie:
+    - forehand_ground
+    - backhand_ground
+    - slice_shot
+    - net_shot
+    - other_shot
     """
-    rows = []
 
-    for pattern_dict in all_pattern_lists:
-        for context, pattern_list in pattern_dict.items():
-            # --- parsing delle info di contesto
-            player = context.split()[0]
-            context_type = " ".join(context.split()[1:-1])  # es: on serve with the 1st
-            surface = context.split()[-1]  # usa la variabile globale
-            phase = "opening"  # per ora fissa, può diventare parametro in futuro
+    from get_mapping_dictionaries import get_mapping_dictionaries
+    shot_types = get_mapping_dictionaries("shot_types")
 
-            # --- estrazione feature
-            agg_features = extract_aggregated_features(pattern_list)  # vettore np.array di shape (9,)
-            pattern_counts = pattern_counts_by_context.get(context, [0] * len(top_patterns))
+    # Mapping dei codici in macro-categorie
+    def map_to_macro_category(shot_code):
+        if shot_code in ['f']:  # forehand groundstroke
+            return 'forehand_ground'
+        elif shot_code in ['b']:  # backhand groundstroke
+            return 'backhand_ground'
+        elif shot_code in ['r', 's']:  # slices
+            return 'slice_shot'
+        elif shot_code in ['v', 'z', 'o', 'p', 'h', 'i', 'j']:  # net play shots
+            return 'net_shot'
+        elif shot_code in ['u', 'y']:
+            return 'dropshot'
 
-            row = {
-                "player": player,
-                "point_type": context_type,
-                "surface": surface,
-                "phase": phase,
-                "%backhand": agg_features[0],
-                "%forehand": agg_features[1],
-                "%volley": agg_features[2],
-                "%drop_shot": agg_features[3],
-                "%slice": agg_features[4],
-                "pattern_variety": agg_features[5],
-                "avg_support": agg_features[6],
-            }
+    # Contatori per ogni posizione
+    counts = {
+        '1st': Counter(),
+        '2nd': Counter(),
+        '3rd': Counter()
+    }
 
-            # Aggiungi le feature dei pattern (una colonna per ciascuno)
-            for i, pattern in enumerate(top_patterns):
-                pattern_str = "pattern_" + "_".join(pattern)  # es: pattern_f36_f17_b15
-                row[pattern_str] = pattern_counts[i]
+    total_points = len(filtered_shots)
 
-            rows.append(row)
+    for shots_seq in filtered_shots['shots']:
+        for idx, shot in enumerate(shots_seq):  # filtered shots sono già i primi 3 colpi del punto
+            shot_type = shot[0]  # solo il primo carattere definisce il tipo di colpo
+            macro_category = map_to_macro_category(shot_type)
 
-    return pd.DataFrame(rows)
+            if idx == 0:
+                counts['1st'][macro_category] += 1
+            elif idx == 1:
+                counts['2nd'][macro_category] += 1
+            elif idx == 2:
+                counts['3rd'][macro_category] += 1
+
+    # Ora costruisco le feature normalizzate
+    feature_dict = {}
+    for position in ['1st', '2nd', '3rd']:
+        for category in ['forehand_ground', 'backhand_ground', 'slice_shot', 'net_shot', 'other_shot']:
+            key = f"{context}_opening_{position}_{category}"
+            feature_dict[key] = counts[position][category] / total_points
+
+    return feature_dict
+
+# todo: aggiustare
+def build_final_dataset(generic_features, opening_phase_features):
+    """
+    Costruisce il dataset finale combinando:
+    - le feature generali (generic_features)
+    - le feature sull'opening phase (opening_phase_features)
+    - (opzionale: in futuro) i bag of patterns
+    """
+
+    final_records = []
+
+    for context, shots in list_of_shots.items():
+        # Combina tutto
+        record = {
+            'context': context.split(",")[0],  # es. "Sinner on serve with the 1st"
+            'surface': context.split(",")[1].replace('on ', '').strip()  # es. "hard"
+        }
+        record.update(generic_features)
+        record.update(opening_phase_features)
+
+        final_records.append(record)
+
+    # Costruisci il DataFrame finale
+    final_df = pd.DataFrame(final_records)
+
+    return final_df
+
