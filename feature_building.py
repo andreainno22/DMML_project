@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
-from collections import Counter
+from collections import Counter, defaultdict
+
 
 # todo: modificare extract_aggregated_features, o eliminare o aggiungere solo bag of patterns
 def extract_aggregated_features(patterns_list):
@@ -70,7 +71,7 @@ def extract_aggregated_features(patterns_list):
 
 def build_generic_features(context, shots):
     total_points = shots.shape[0]
-    volley_codes = {'v', 'z', 'o', 'p', 'h', 'i', 'j'}
+    volley_codes = {'v', 'z', 'o', 'p', 'h', 'i', 'j', 'k'}
     not_volley_codes = {'f', 'b', 's', 'r', 'u', 'y'}
     slice_codes = {'r', 's'}
     dropshots_codes = {'u', 'y'}
@@ -83,7 +84,8 @@ def build_generic_features(context, shots):
         # numero di colpi totale escludendo il servizio
         total_no_service_shots = shots['shots'].apply(lambda seq: len(seq) - 1).sum()
         # conta gli ace
-        ace_num = shots[(shots['shots'].apply(len) == 1) & (shots['outcome'].str.contains(r'\*', regex=True))].copy().shape[0]
+        ace_num = \
+            shots[(shots['shots'].apply(len) == 1) & (shots['outcome'].str.contains(r'\*', regex=True))].copy().shape[0]
         ace_rate = ace_num / total_points
     else:
         # se len <= 1 vuol dire che c'è stato solo servizio e risposta o solo servizio
@@ -126,7 +128,7 @@ def build_generic_features(context, shots):
     net_points_rate = total_volley_points / total_points_started
 
     # numero di punti vinti dopo essere stato a rete almeno una vota durante lo scambio
-    net_points_won = shots[(shots['won_by_player'] is True) &
+    net_points_won = shots[(shots['won_by_player'] == True) &
                            (shots['shots'].apply(lambda sequence:
                                                  any(code in shot and '=' not in shot for shot in sequence for code in
                                                      volley_codes) or
@@ -139,12 +141,14 @@ def build_generic_features(context, shots):
         net_points_won_rate = 0
 
     # escludo dai total points quelli per cui non c'è stata risposta
-    winners = shots[(shots['won_by_player'] is True) & (shots['outcome'].str.contains(r'\*', regex=True)) & (len(shots['shots']) > 1)].shape[0]
+    winners = shots[(shots['won_by_player'] == True) & (shots['outcome'].str.contains(r'\*', regex=True)) & (
+            len(shots['shots']) > 1)].shape[0]
     winners_rate = winners / total_points_with_return
 
     # escludo dai total points quelli per cui non c'è stata risposta
     unforced_errors_rate = \
-        shots[(shots['shots'].apply(len) > 1) & (shots['outcome'].str.contains(r'\#', regex=True)) & (shots['won_by_player'] is False)].shape[
+        shots[(shots['shots'].apply(len) > 1) & (shots['outcome'].str.contains(r'\#', regex=True)) & (
+                shots['won_by_player'] == False)].shape[
             0] / total_points_with_return
 
     # percentuale di slice su colpi totali
@@ -176,10 +180,10 @@ def build_generic_features(context, shots):
     dt_line_rate = dt_line / total_no_service_shots
 
     generic_features = {'average_shot_length': avg_shot_length, 'net_points_rate': net_points_rate,
-            'net_points_won_rate': net_points_won_rate, 'winners_rate': winners_rate,
-            'unforced_errors_rate': unforced_errors_rate, 'slices_rate': slices_rate,
-            'dropshots_rate': dropshots_rate, 'crosscourt_rate': crosscourt_rate,
-            'middlecourt_rate': middle_rate, 'down_the_line_rate': dt_line_rate}
+                        'net_points_won_rate': net_points_won_rate, 'winners_rate': winners_rate,
+                        'unforced_errors_rate': unforced_errors_rate, 'slices_rate': slices_rate,
+                        'dropshots_rate': dropshots_rate, 'crosscourt_rate': crosscourt_rate,
+                        'middlecourt_rate': middle_rate, 'down_the_line_rate': dt_line_rate}
 
     if str.__contains__(context, "on serve"):
         return generic_features | {'ace_rate': ace_rate}
@@ -187,32 +191,52 @@ def build_generic_features(context, shots):
         return generic_features | {'average_response_depth': avg_resp_depth}
 
 
+"""# todo: attenzione, controllare, output strano
 def build_opening_phase_features(context, filtered_shots):
-    """
+
     Estrae feature sulle categorie di colpi nei primi 3 colpi della sequenza.
-    Macro-categorie:
+    Macro-categorie per i punti IN RISPOSTA:
     - forehand_ground
     - backhand_ground
     - slice_shot
     - net_shot
-    - other_shot
-    """
+    - dropshot
+    
+    Macro-categorie per i punti AL SERVIZIO:
+    - forehand_ground
+    - backhand_ground
+    - slice_shot
+    - net_shot
+    - dropshot
+    solo come 1° COLPO della sequenza
+    - wide_serve
+    - body_serve
+    - down_the_T_serve
+
 
     from get_mapping_dictionaries import get_mapping_dictionaries
     shot_types = get_mapping_dictionaries("shot_types")
+    serve_direction = get_mapping_dictionaries("serve_direction")
 
     # Mapping dei codici in macro-categorie
     def map_to_macro_category(shot_code):
+        if shot_code in serve_direction[4]:
+            return serve_direction[4]
+        elif shot_code in shot_types[5]:
+            return serve_direction[5]
+        elif shot_code in shot_types[6]:
+            return serve_direction[6]
         if shot_code in ['f']:  # forehand groundstroke
-            return 'forehand_ground'
+            return shot_types['f']
         elif shot_code in ['b']:  # backhand groundstroke
-            return 'backhand_ground'
+            return shot_types['b']
         elif shot_code in ['r', 's']:  # slices
             return 'slice_shot'
-        elif shot_code in ['v', 'z', 'o', 'p', 'h', 'i', 'j']:  # net play shots
+        elif shot_code in ['v', 'z', 'o', 'p', 'h', 'i', 'j', 'k']:  # net play shots
             return 'net_shot'
         elif shot_code in ['u', 'y']:
             return 'dropshot'
+        return None
 
     # Contatori per ogni posizione
     counts = {
@@ -238,36 +262,170 @@ def build_opening_phase_features(context, filtered_shots):
     # Ora costruisco le feature normalizzate
     feature_dict = {}
     for position in ['1st', '2nd', '3rd']:
-        for category in ['forehand_ground', 'backhand_ground', 'slice_shot', 'net_shot', 'other_shot']:
-            key = f"{context}_opening_{position}_{category}"
+        for category in ['forehand_ground', 'backhand_ground', 'slice_shot', 'net_shot', 'dropshot']:
+            key = f"opening_{position}_{category}"
             feature_dict[key] = counts[position][category] / total_points
 
-    return feature_dict
+    return feature_dict"""
+
+
+# todo: fare attenzione alla normalizzazione, che la somma di tutti i rate faccia 1 (ora non lo è perchè alcuni colpi non vengono considerati)
+def build_opening_phase_features(context, filtered_shots):
+    """
+    Estrae feature sulle categorie di colpi nei primi SHOT_LENGTH (tipicamente 3) colpi della sequenza.
+    Se il contesto è 'on serve', il 1° colpo viene mappato usando serve_direction.
+    Altrimenti (contesto 'on response'), anche il 1° colpo usa la mappatura standard.
+    Il 2° e 3° colpo usano sempre la mappatura standard.
+
+    Macro-categorie per punti IN RISPOSTA (e per 2°/3° colpo al servizio):
+    - forehand_ground
+    - backhand_ground
+    - slice_shot
+    - net_shot
+    - dropshot
+
+    Macro-categorie aggiuntive SOLO per il 1° COLPO AL SERVIZIO:
+    - wide_serve
+    - body_serve
+    - down_the_T_serve
+    (Derivate da `serve_direction`)
+    """
+    # Assicurati che questa funzione sia importabile correttamente
+    from get_mapping_dictionaries import get_mapping_dictionaries
+    shot_types = get_mapping_dictionaries("shot_types")  # Usato per riferimento sotto
+    serve_directions = get_mapping_dictionaries("serve_directions")  # Dizionario {codice: nome_categoria_servizio}
+    UNKNOWN_SERVE_CATEGORY = 'unknown direction'  # Assicurati che questo sia il valore esatto nel dizionario
+
+    # Funzione di mappatura per colpi di scambio (non servizio)
+    def map_rally_shot(shot_code):
+        # Nota: shot_types non viene usato direttamente qui, si usano nomi categoria fissi
+        # Se shot_types contenesse {'f': 'forehand_ground', ...} potresti usarlo
+        if shot_code == 'f':  # forehand groundstroke
+            return 'forehand_ground'
+        elif shot_code == 'b':  # backhand groundstroke
+            return 'backhand_ground'
+        elif shot_code in ['r', 's']:  # slices
+            return 'slice_shot'
+        # Aggiornato con 'k' come nella vecchia funzione map_to_macro_category
+        elif shot_code in ['v', 'z', 'o', 'p', 'h', 'i', 'j', 'k']:  # net play shots
+            return 'net_shot'
+        elif shot_code in ['u', 'y']:  # dropshots
+            return 'dropshot'
+        return None  # Codice non riconosciuto come colpo di scambio
+
+    # Funzione di mappatura specifica per il servizio, IGNORA UNKNOWN_SERVE_CATEGORY
+    def map_serve_direction_shot(shot_code):
+        category = serve_directions.get(shot_code)
+        # Se la categoria è quella da ignorare, trattala come non riconosciuta (None)
+        if category == UNKNOWN_SERVE_CATEGORY:
+            return None
+        return category
+
+
+    # Contatori per ogni posizione (1st, 2nd, 3rd)
+    counts = defaultdict(Counter)  # Usa defaultdict per semplicità
+
+    total_points = len(filtered_shots)
+
+    is_serve_context = "on serve" in context
+
+    # Itera sulle sequenze filtrate (già tagliate a SHOT_LENGTH)
+    for shots_seq in filtered_shots['shots']:
+        for idx, shot in enumerate(shots_seq):
+            if not shot:
+                continue  # Salta eventuali stringhe vuote
+
+            position_label = f"{idx + 1}{'st' if idx == 0 else 'nd' if idx == 1 else 'rd'}"  # 1st, 2nd, 3rd
+            shot_code = shot[0]  # Prendi solo il primo carattere come codice tipo
+            macro_category = None
+
+            # Applica la logica di mappatura condizionale
+            if idx == 0 and is_serve_context:
+                # Primo colpo nel contesto di servizio -> usa mappa servizio
+                macro_category = map_serve_direction_shot(shot_code)
+            else:
+                # Secondo/terzo colpo, oppure qualsiasi colpo in contesto di risposta -> usa mappa scambio
+                macro_category = map_rally_shot(shot_code)
+
+            # Incrementa il contatore solo se la categoria è valida
+            if macro_category:
+                counts[position_label][macro_category] += 1
+
+    feature_dict = {}
+    rally_categories = ['forehand_ground', 'backhand_ground', 'slice_shot', 'net_shot', 'dropshot']
+
+    if is_serve_context:
+        # Contesto Servizio: Calcola feature servizio (1st) e scambio (2nd, 3rd)
+        for serve_code, category_name in serve_directions.items():
+            if category_name == UNKNOWN_SERVE_CATEGORY:
+                continue
+            key = f"opening_1st_{category_name.lower().replace(' ', '_')}"
+            feature_dict[key] = counts['1st'][category_name] / total_points
+
+        for position in ['2nd', '3rd']:
+            for category in rally_categories:
+                key = f"opening_{position}_{category}"
+                feature_dict[key] = counts[position][category] / total_points
+    else:
+        # Contesto Risposta: Calcola solo feature scambio (1st, 2nd, 3rd)
+        for position in ['1st', '2nd', '3rd']:
+            for category in rally_categories:
+                key = f"opening_{position}_{category}"
+                feature_dict[key] = counts[position][category] / total_points
+
+            # --- Assicura Chiavi Mancanti (Contesto-dipendente) ---
+    all_possible_keys = set()
+    if is_serve_context:
+        # Contesto Servizio: Chiavi servizio (1st) e scambio (2nd, 3rd)
+        for serve_cat in serve_directions.values():
+            if serve_cat == UNKNOWN_SERVE_CATEGORY: continue
+            all_possible_keys.add(f"opening_1st_{serve_cat.lower().replace(' ', '_')}")
+        for position in ['2nd', '3rd']:
+            for rally_cat in rally_categories:
+                all_possible_keys.add(f"opening_{position}_{rally_cat}")
+    else:
+        # Contesto Risposta: Solo chiavi scambio (1st, 2nd, 3rd)
+        for position in ['1st', '2nd', '3rd']:
+            for rally_cat in rally_categories:
+                all_possible_keys.add(f"opening_{position}_{rally_cat}")
+
+    # Completa il dizionario con 0.0 per le chiavi mancanti definite per questo contesto
+    final_feature_dict = {key: feature_dict.get(key, 0.0) for key in all_possible_keys}
+    return final_feature_dict
+    # --- Fine Assicura Chiavi Mancanti ---
+
 
 # todo: aggiustare
-def build_final_dataset(generic_features, opening_phase_features):
+def build_final_dataset(all_features_by_context):
     """
-    Costruisce il dataset finale combinando:
-    - le feature generali (generic_features)
-    - le feature sull'opening phase (opening_phase_features)
-    - (opzionale: in futuro) i bag of patterns
+    Costruisce un dizionario di DataFrame, uno per ogni contesto base,
+    contenente le features combinate (generiche + opening phase) per ogni giocatore.
+
+    Args:
+        all_features_by_context: Dizionario {base_context: [lista di dizionari feature per player]}
+
+    Returns:
+        dict: Dizionario {base_context: pd.DataFrame}, dove ogni DataFrame
+              contiene le features combinate per quel contesto, con una riga per giocatore.
     """
+    final_datasets = {}
+    for base_context, player_features_list in all_features_by_context.items():
+        if player_features_list:  # Verifica se ci sono dati per questo contesto
+            # Crea il DataFrame dalla lista di dizionari
+            context_df = pd.DataFrame(player_features_list)
 
-    final_records = []
+            # Opzionale: Riordina le colonne mettendo 'player' per prima
+            if 'player' in context_df.columns:
+                cols = ['player'] + [col for col in context_df.columns if col != 'player']
+                context_df = context_df[cols]
 
-    for context, shots in list_of_shots.items():
-        # Combina tutto
-        record = {
-            'context': context.split(",")[0],  # es. "Sinner on serve with the 1st"
-            'surface': context.split(",")[1].replace('on ', '').strip()  # es. "hard"
-        }
-        record.update(generic_features)
-        record.update(opening_phase_features)
+            # Opzionale: Imposta 'player' come indice se preferito
+            # context_df = context_df.set_index('player')
 
-        final_records.append(record)
+            final_datasets[base_context] = context_df
+        else:
+            # Se non ci sono features per un contesto, crea un DataFrame vuoto
+            print(f"Attenzione: Nessuna feature trovata per il contesto '{base_context}'")
+            final_datasets[base_context] = pd.DataFrame()  # Ritorna un DF vuoto
 
-    # Costruisci il DataFrame finale
-    final_df = pd.DataFrame(final_records)
-
-    return final_df
-
+    return final_datasets

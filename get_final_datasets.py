@@ -19,11 +19,15 @@ def filter_and_trim_shots(shots_df):
 
 # todo: ora come ora vengono considerati solo i primi 3 colpi dei punti come patterns
 
-def get_pattern_dictionary(df):
+def get_final_datasets(df):
     all_pattern_lists = []
     list_of_shots = {}
+    all_features_by_context = defaultdict(list)  # Dizionario per accumulare features per contesto base
+
     for player in PLAYERS:
-        for surface in PLAYER_SURFACES_DICT[player]:
+        player_contexts_data = {}  # Dizionario temporaneo per dati del giocatore corrente
+
+        for surface in PLAYER_SURFACES_DICT.get(player, []):
             # estraggo il dataframe con i punti in cui sinner è al servizio
             player_on_service = get_service_points_df(player, df, surface)
 
@@ -31,37 +35,63 @@ def get_pattern_dictionary(df):
             player_on_response = get_response_points_df(player, df, surface)
 
             # estraggo i punti in cui il giocatore è al servizio
-            player_shots_1st_service = get_shots_by_server(get_shots_in_1st_serve_points(player_on_service))
-            player_shots_2nd_service = get_shots_by_server(get_shots_in_2nd_serve_points(player_on_service))
+            shots_1st_service = get_shots_by_server(get_shots_in_1st_serve_points(player_on_service))
+            shots_2nd_service = get_shots_by_server(get_shots_in_2nd_serve_points(player_on_service))
 
             # estraggo i punti in cui il giocatore è in risposta
-            player_shots_1st_serve_response = get_shots_by_receiver(get_shots_in_1st_serve_points(player_on_response))
-            player_shots_2nd_serve_response = get_shots_by_receiver(get_shots_in_2nd_serve_points(player_on_response))
+            shots_1st_response = get_shots_by_receiver(get_shots_in_1st_serve_points(player_on_response))
+            shots_2nd_response = get_shots_by_receiver(get_shots_in_2nd_serve_points(player_on_response))
 
-            # crea un dizionario contenente ogni constesto, dove ogni contesto è composto da nome giocatore, tipo di punto e superficie
-            list_of_shots = list_of_shots | {
-                player + " on serve with the 1st, on " + surface: player_shots_1st_service.copy(),
-                player + " on serve with the 2nd, on " + surface: player_shots_2nd_service.copy(),
-                player + " on response with the 1st, on " + surface: player_shots_1st_serve_response.copy(),
-                player + " on response with the 2nd, on " + surface: player_shots_2nd_serve_response.copy()}
+            # Popola il dizionario temporaneo con i dati per questo giocatore e superficie
+            # La chiave è il contesto completo, il valore è la tupla (shots_originali, shots_da_filtrare)
+            player_contexts_data.update({
+                f"{player} on serve with the 1st, on {surface}": (shots_1st_service.copy(), shots_1st_service.copy()),
+                f"{player} on serve with the 2nd, on {surface}": (shots_2nd_service.copy(), shots_2nd_service.copy()),
+                f"{player} on response with the 1st, on {surface}": (shots_1st_response.copy(),
+                                                                     shots_1st_response.copy()),
+                f"{player} on response with the 2nd, on {surface}": (shots_2nd_response.copy(),
+                                                                     shots_2nd_response.copy())
+            })
 
         # itera per ogni context, ovvero ogni punto di vista (serve o response) e per ogni colpo (1st o 2nd)
-        for context, shots in list_of_shots.items():
+        for context, (shots, shots_to_filter) in player_contexts_data.items():
             pattern_list_in_context = []
             # filtro i colpi per >= di SHOT_LENGTH e taglio ai primi SHOT_LENGTH
-            filtered_shots = filter_and_trim_shots(shots)
+            filtered_shots = filter_and_trim_shots(shots_to_filter)
             for seq, support, win_percentage, most_frequent_outcome in get_freq_shots_seqs(filtered_shots):
-                #itera su tutti i pattern trovati e li aggiunge al dataset finale, con le features generali
+                # itera su tutti i pattern trovati e li aggiunge al dataset finale, con le features generali
                 pattern_list_in_context.append((seq, support, win_percentage, most_frequent_outcome))
-                # print(
-                #    f"Sequence: {seq}, Support: {support}, Win percentage: {win_percentage:.2f}%, Most frequent outcome: {most_frequent_outcome}")
             all_pattern_lists.append({context: pattern_list_in_context})
             # costruisce le features generiche a partire da tutti i punti con lunghezza
             generic_features = build_generic_features(context, shots)
             opening_phase_features = build_opening_phase_features(context, filtered_shots)
 
-    return build_final_dataset(generic_features, opening_phase_features)
-    #return build_pattern_vocabulary(all_pattern_lists)
+            # Controlla eventuali chiavi duplicate (opzionale ma consigliato)
+            common_keys = set(generic_features.keys()) & set(opening_phase_features.keys())
+            if common_keys:
+                print(
+                    f"Attenzione: Chiavi duplicate trovate tra generic e opening features per {context}: {common_keys}")
+                # Gestisci la collisione se necessario (es. rinominando o scegliendo una)
+
+            # Combina le features in un unico dizionario
+            combined_features = {**generic_features, **opening_phase_features}
+            combined_features['player'] = player  # Aggiungi l'identificativo del giocatore
+
+            # Estrai il contesto base (senza il nome del giocatore) per usarlo come chiave
+            # Raggruppa i dati di giocatori diversi per lo stesso tipo di contesto
+            try:
+                # Trova la prima occorrenza del nome del giocatore seguito da spazio e prendi il resto
+                base_context = context.split(f"{player} ", 1)[1]
+            except IndexError:
+                # Fallback nel caso improbabile che il formato del contesto sia diverso
+                print(f"Attenzione: formato contesto non standard '{context}'")
+                base_context = context
+
+                # Aggiungi le features combinate alla lista per il contesto base corrispondente
+            all_features_by_context[base_context].append(combined_features.copy())
+
+    return build_final_dataset(all_features_by_context)
+    # return build_pattern_vocabulary(all_pattern_lists)
 
 
 from collections import Counter, defaultdict
@@ -119,4 +149,3 @@ def build_pattern_vocabulary(all_pattern_lists):
 
     # 3. Costruzione dataset finale
     return build_final_dataset(top_patterns_per_context, pattern_counts_by_context, all_pattern_lists)
-
