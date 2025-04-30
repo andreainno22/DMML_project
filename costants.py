@@ -1,11 +1,11 @@
 SHOT_LENGTH = 3  # Lunghezza dei colpi da considerare
 SURFACES = ["hard", "clay", "grass"]
+MIN_NUM_OF_POINTS = 30  # Numero minimo di colpi per player per contesto per essere considerato nel clustering
 MIN_SUPPORT = 0.01  # Supporto minimo per le sequenze frequenti
 MIN_SEQUENCE_LENGTH = 3  # Lunghezza minima della sequenza
 TOP_PATTERNS = 50  # Numero di pattern frequenti inseriti nel dizionario
 MIN_PLAYERS = 3  # numero minimo di giocatori che utilizza un pattern affinchè il pattern venga considerato per essere nei top_patterns
-PLAYERS = ['Abedallah_Shelbayh', 'Adam_Walton', 'Adrian_Andreev']
-""", 'Adrian_Mannarino', 'Albert_Ramos',
+PLAYERS = ['Abedallah_Shelbayh', 'Adam_Walton', 'Adrian_Andreev', 'Adrian_Mannarino', 'Albert_Ramos',
            'Alejandro_Davidovich_Fokina', 'Alejandro_Moro_Canas', 'Alejandro_Tabilo', 'Aleksandar_Kovacevic',
            'Aleksandar_Vukic', 'Aleksandre_Metreveli', 'Alessandro_Giannessi', 'Alex_Barrena', 'Alex_Bolt',
            'Alex_De_Minaur', 'Alex_Marti_Pujolras', 'Alex_Michelsen', 'Alex_Molcan', 'Alexander_Blockx',
@@ -22,9 +22,9 @@ PLAYERS = ['Abedallah_Shelbayh', 'Adam_Walton', 'Adrian_Andreev']
            'Colton_Smith', 'Conner_Huertas_Del_Pino', 'Constant_Lestienne', 'Cooper_Kose', 'Cooper_Williams',
            'Corentin_Moutet', 'Cristian_Garin', 'Dalibor_Svrcina', 'Damir_Dzumhur', 'Daniel_Altmaier',
            'Daniel_Dutra_Da_Silva', 'Daniel_Elahi_Galan', 'Daniel_Evans', 'Daniel_Masur', 'Daniel_Michalski',
-           'Daniel_Rincon', 'Daniil_Medvedev', 'David_Goffin', 'Denis_Istomin', 'Denis_Kudla', 'Denis_Shapovalov',
+           'Daniel_Rincon', 'Daniil_Medvedev','David_Goffin', 'Denis_Istomin', 'Denis_Kudla', 'Denis_Shapovalov',
            'Dennis_Novak', 'Diego_Schwartzman', 'Dimitar_Kuzmanov', 'Dino_Prizmic', 'Dmitry_Popko', 'Dominic_Stricker',
-           'Dominic_Thiem', 'Dominik_Koepfer', 'Duje_Ajdukovic', 'Dusan_Lajovic', 'Dylan_Dietrich', 'Egor_Gerasimov',
+           'Dominic_Thiem', 'Dominik_Koepfer', 'Duje_Ajdukovic', 'Dusan_Lajovic', 'Dylan_Dietrich', 'Egor_Gerasimov'
            'Elias_Ymer', 'Elliot_Benchetrit', 'Emil_Ruusuvuori', 'Emilio_Gomez', 'Emilio_Nava', 'Enzo_Couacaud',
            'Ernests_Gulbis', 'Ethan_Quinn', 'Evan_Furness', 'Evan_Zhu', 'Evgeny_Donskoy', 'Fabian_Marozsan',
            'Fabio_Fognini', 'Facundo_Bagnis', 'Facundo_Diaz_Acosta', 'Facundo_Mena', 'Federico_Agustin_Gomez',
@@ -80,7 +80,7 @@ PLAYERS = ['Abedallah_Shelbayh', 'Adam_Walton', 'Adrian_Andreev']
            'Vasek_Pospisil', 'Viktor_Durasovic', 'Viktor_Troicki', 'Vilius_Gaubas', 'Vit_Kopriva', 'Yannick_Hanfmann',
            'Yasutaka_Uchiyama', 'Yibing_Wu', 'Yoshihito_Nishioka', 'Yosuke_Watanuki', 'Younes_Lalami_Laaroussi',
            'Yu_Hsiou_Hsu', 'Yuichi_Sugita', 'Zachary_Svajda', 'Zdenek_Kolar', 'Zhizhen_Zhang', 'Zizou_Bergs',
-           'Zsombor_Piros']"""
+           'Zsombor_Piros']
 
 PLAYER_SURFACES_DICT = {'Abedallah_Shelbayh': {'hard'}, 'Adam_Walton': {'hard'}, 'Adrian_Andreev': {'hard', 'clay'},
                         'Adrian_Mannarino': {'grass', 'hard'}, 'Albert_Ramos': {'grass', 'hard', 'clay'},

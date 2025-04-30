@@ -69,12 +69,27 @@ def extract_aggregated_features(patterns_list):
     ])
 
 
-def build_generic_features(context, shots):
+total_players_with_not_null_avg_resp_depth_per_context = {}
+avg_resp_depth_per_context = {}
+dict_of_players_with_none_avg_resp_depth_per_context = {}
+
+
+def build_generic_features(player, context, shots):
     total_points = shots.shape[0]
     volley_codes = {'v', 'z', 'o', 'p', 'h', 'i', 'j', 'k'}
     not_volley_codes = {'f', 'b', 's', 'r', 'u', 'y'}
     slice_codes = {'r', 's'}
     dropshots_codes = {'u', 'y'}
+    base_context = context.split(f"{player} ", 1)[1]
+
+    # queste 3 variabili servono per gestire il filling della variabile ave_depth_response quando non presente.
+    # La logica è che viene riempita con la media del contesto. Per farlo prima bisogna tenere traccia di tutte le avg_depth_resp del
+    # contesto e alla fine fare la media per il contesto. Nel frattempo è necessario mantenere in
+    # dict_of_players_with_none_avg_resp_depth_per_context i nomi dei giocatori con la variabile nulla, che verrà
+    # riempita in build_final_dataset
+    total_players_with_not_null_avg_resp_depth_per_context.setdefault(base_context, 0)
+    avg_resp_depth_per_context.setdefault(base_context, 0)
+    dict_of_players_with_none_avg_resp_depth_per_context.setdefault(base_context, [])
 
     if str.__contains__(context, "on serve"):
         # se len <= 2 vuol dire che c'è stato solo servizio e risposta o solo servizio
@@ -116,7 +131,22 @@ def build_generic_features(context, shots):
         # .mean() ignora automaticamente i valori NaN/None
         avg_resp_depth = points_with_returns['return_depth_value'].mean()
 
+        if not np.isnan(avg_resp_depth):
+            total_players_with_not_null_avg_resp_depth_per_context[base_context] += 1
+            avg_resp_depth_per_context[base_context] += avg_resp_depth
+        else:
+            total_players_with_not_null_avg_resp_depth_per_context[base_context] += 1
+            dict_of_players_with_none_avg_resp_depth_per_context[base_context].append(player)
+
+        # 6. Rimuovi la colonna temporanea
+        points_with_returns.drop(columns=['return_depth_value'], inplace=True)
+        # 7. Assegna la media alla variabile
+        # if avg_resp_depth is None:
+        # alcuni giocatori non hanno info su depth in alcuni contesti
+        # avg_resp_depth = 0.0
+
     avg_shot_length = shots['shots'].apply(len).mean()
+
 
     # numero di punti con discesa a rete
     total_volley_points = shots[
@@ -191,84 +221,6 @@ def build_generic_features(context, shots):
         return generic_features | {'average_response_depth': avg_resp_depth}
 
 
-"""# todo: attenzione, controllare, output strano
-def build_opening_phase_features(context, filtered_shots):
-
-    Estrae feature sulle categorie di colpi nei primi 3 colpi della sequenza.
-    Macro-categorie per i punti IN RISPOSTA:
-    - forehand_ground
-    - backhand_ground
-    - slice_shot
-    - net_shot
-    - dropshot
-    
-    Macro-categorie per i punti AL SERVIZIO:
-    - forehand_ground
-    - backhand_ground
-    - slice_shot
-    - net_shot
-    - dropshot
-    solo come 1° COLPO della sequenza
-    - wide_serve
-    - body_serve
-    - down_the_T_serve
-
-
-    from get_mapping_dictionaries import get_mapping_dictionaries
-    shot_types = get_mapping_dictionaries("shot_types")
-    serve_direction = get_mapping_dictionaries("serve_direction")
-
-    # Mapping dei codici in macro-categorie
-    def map_to_macro_category(shot_code):
-        if shot_code in serve_direction[4]:
-            return serve_direction[4]
-        elif shot_code in shot_types[5]:
-            return serve_direction[5]
-        elif shot_code in shot_types[6]:
-            return serve_direction[6]
-        if shot_code in ['f']:  # forehand groundstroke
-            return shot_types['f']
-        elif shot_code in ['b']:  # backhand groundstroke
-            return shot_types['b']
-        elif shot_code in ['r', 's']:  # slices
-            return 'slice_shot'
-        elif shot_code in ['v', 'z', 'o', 'p', 'h', 'i', 'j', 'k']:  # net play shots
-            return 'net_shot'
-        elif shot_code in ['u', 'y']:
-            return 'dropshot'
-        return None
-
-    # Contatori per ogni posizione
-    counts = {
-        '1st': Counter(),
-        '2nd': Counter(),
-        '3rd': Counter()
-    }
-
-    total_points = len(filtered_shots)
-
-    for shots_seq in filtered_shots['shots']:
-        for idx, shot in enumerate(shots_seq):  # filtered shots sono già i primi 3 colpi del punto
-            shot_type = shot[0]  # solo il primo carattere definisce il tipo di colpo
-            macro_category = map_to_macro_category(shot_type)
-
-            if idx == 0:
-                counts['1st'][macro_category] += 1
-            elif idx == 1:
-                counts['2nd'][macro_category] += 1
-            elif idx == 2:
-                counts['3rd'][macro_category] += 1
-
-    # Ora costruisco le feature normalizzate
-    feature_dict = {}
-    for position in ['1st', '2nd', '3rd']:
-        for category in ['forehand_ground', 'backhand_ground', 'slice_shot', 'net_shot', 'dropshot']:
-            key = f"opening_{position}_{category}"
-            feature_dict[key] = counts[position][category] / total_points
-
-    return feature_dict"""
-
-
 # todo: fare attenzione alla normalizzazione, che la somma di tutti i rate faccia 1 (ora non lo è perchè alcuni colpi non vengono considerati)
 def build_opening_phase_features(context, filtered_shots):
     """
@@ -281,8 +233,8 @@ def build_opening_phase_features(context, filtered_shots):
     - forehand_ground
     - backhand_ground
     - slice_shot
-    - net_shot
-    - dropshot
+    - net_shot -> TOLTA, INUTILE NEI PRIMI 3 COLPI
+    - dropshot -> TOLTA, INUTILE NEI PRIMI 3 COLPI
 
     Macro-categorie aggiuntive SOLO per il 1° COLPO AL SERVIZIO:
     - wide_serve
@@ -306,11 +258,6 @@ def build_opening_phase_features(context, filtered_shots):
             return 'backhand_ground'
         elif shot_code in ['r', 's']:  # slices
             return 'slice_shot'
-        # Aggiornato con 'k' come nella vecchia funzione map_to_macro_category
-        elif shot_code in ['v', 'z', 'o', 'p', 'h', 'i', 'j', 'k']:  # net play shots
-            return 'net_shot'
-        elif shot_code in ['u', 'y']:  # dropshots
-            return 'dropshot'
         return None  # Codice non riconosciuto come colpo di scambio
 
     # Funzione di mappatura specifica per il servizio, IGNORA UNKNOWN_SERVE_CATEGORY
@@ -321,11 +268,12 @@ def build_opening_phase_features(context, filtered_shots):
             return None
         return category
 
-
     # Contatori per ogni posizione (1st, 2nd, 3rd)
     counts = defaultdict(Counter)  # Usa defaultdict per semplicità
 
     total_points = len(filtered_shots)
+    if total_points == 0:
+        print(f"WARNING: filtered_shots is empty for context: {context}")
 
     is_serve_context = "on serve" in context
 
@@ -352,7 +300,7 @@ def build_opening_phase_features(context, filtered_shots):
                 counts[position_label][macro_category] += 1
 
     feature_dict = {}
-    rally_categories = ['forehand_ground', 'backhand_ground', 'slice_shot', 'net_shot', 'dropshot']
+    rally_categories = ['forehand_ground', 'backhand_ground', 'slice_shot']
 
     if is_serve_context:
         # Contesto Servizio: Calcola feature servizio (1st) e scambio (2nd, 3rd)
@@ -395,7 +343,7 @@ def build_opening_phase_features(context, filtered_shots):
     # --- Fine Assicura Chiavi Mancanti ---
 
 
-# todo: aggiustare
+# todo: da aggiungere i bag of patterns (se utili)
 def build_final_dataset(all_features_by_context):
     """
     Costruisce un dizionario di DataFrame, uno per ogni contesto base,
@@ -419,13 +367,26 @@ def build_final_dataset(all_features_by_context):
                 cols = ['player'] + [col for col in context_df.columns if col != 'player']
                 context_df = context_df[cols]
 
-            # Opzionale: Imposta 'player' come indice se preferito
-            # context_df = context_df.set_index('player')
+            # Imposta 'player' come indice se preferito
+            context_df = context_df.set_index('player')
 
+            # riempie il dato mancante di avg_depth_response con la media del contesto
+            if "on response" in base_context:
+                for player in dict_of_players_with_none_avg_resp_depth_per_context[base_context]:
+                    if np.isnan(context_df.loc[player, 'average_response_depth']):
+                        context_df.loc[player, 'average_response_depth'] = avg_resp_depth_per_context[base_context] / \
+                                                                           total_players_with_not_null_avg_resp_depth_per_context[
+                                                                               base_context]
             final_datasets[base_context] = context_df
         else:
             # Se non ci sono features per un contesto, crea un DataFrame vuoto
             print(f"Attenzione: Nessuna feature trovata per il contesto '{base_context}'")
             final_datasets[base_context] = pd.DataFrame()  # Ritorna un DF vuoto
+    counts = []
 
+    # conta per contesto il numero di giocatori che non hanno info sulla profondità della risposta
+    for context, df in final_datasets.items():
+        if "on response" in context:
+            counts.append(df['average_response_depth'].isna().sum())
+    print(f"Numero totale di NaN in average_response_depth: {counts}")
     return final_datasets
