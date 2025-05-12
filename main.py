@@ -12,7 +12,7 @@ from get_freq_shots_seqs import get_freq_shots_seqs
 from get_final_datasets import get_final_datasets
 from get_shots import get_shots_in_1st_serve_points, get_shots_in_2nd_serve_points
 from get_shots_wo_opponent_shots import get_shots_by_server, get_shots_by_receiver
-from run_clustering import run_clustering
+from run_clustering import run_kmeans_clustering
 
 #todo: problema, per avere pattern giocati da tutti i giocatori devo abbassare parecchio il minsup, allora perde di significato
 # todo: sennò potrei trovare i pattern frequenti per ogni giocatore, tutti della stessa lunghezza, poi posso calcolare nuove feature come: %forehand come primo colpo, %backhand come secondo colpo, etc

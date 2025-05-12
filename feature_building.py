@@ -145,6 +145,7 @@ def build_generic_features(player, context, shots):
         # alcuni giocatori non hanno info su depth in alcuni contesti
         # avg_resp_depth = 0.0
 
+    # è il numero medio di colpi fatti dal giocatore, non proprio la lunghezza dello scambio
     avg_shot_length = shots['shots'].apply(len).mean()
 
 
@@ -362,7 +363,7 @@ def build_final_dataset(all_features_by_context):
             # Crea il DataFrame dalla lista di dizionari
             context_df = pd.DataFrame(player_features_list)
 
-            # Opzionale: Riordina le colonne mettendo 'player' per prima
+            # Riordina le colonne mettendo 'player' per prima
             if 'player' in context_df.columns:
                 cols = ['player'] + [col for col in context_df.columns if col != 'player']
                 context_df = context_df[cols]
