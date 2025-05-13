@@ -8,6 +8,7 @@ from sklearn.feature_selection import VarianceThreshold
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
 from sklearn.metrics import silhouette_score
+from sklearn.metrics import davies_bouldin_score
 from random import sample
 from numpy.random import uniform
 
@@ -381,6 +382,10 @@ def run_umap_agglomerative_clustering(df, context_cols=None, n_clusters=3,
     # 4. Silhouette score
     sil_score = silhouette_score(X_umap, cluster_labels)
     print(f"Silhouette score (Agglomerative + UMAP): {sil_score:.3f}")
+
+    # Calcolo del DBI
+    dbi = davies_bouldin_score(X_umap, cluster_labels)
+    print(f"Dbi score (Agglomerative + UMAP): {dbi:.3f}")
 
     # 5. Visualizzazione 2D (con nuova UMAP a 2D solo per visual)
     if visualize:
