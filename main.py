@@ -34,7 +34,7 @@ def main():
         print("\n" + "=" * 50 + "\n")  # Separatore per migliorare la leggibilità
 
     # Crea una directory per salvare i file CSV, se non esiste
-    output_dir = "feature_datasets_csv"
+    output_dir = "feature_datasets_csv_reduced_contexts"
     os.makedirs(output_dir, exist_ok=True)
 
     # Itera su ogni elemento del dizionario e salva i DataFrame in file CSV

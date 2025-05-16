@@ -172,13 +172,14 @@ def build_generic_features(player, context, shots):
         net_points_won_rate = 0
 
     # escludo dai total points quelli per cui non c'è stata risposta
+    # se "on serve" escludo i punti finiti con il servizio, per evitare di contare gli ace
     winners = shots[(shots['won_by_player'] == True) & (shots['outcome'].str.contains(r'\*', regex=True)) & (
-            len(shots['shots']) > 1)].shape[0]
+            len(shots['shots']) > 1 if "on serve" in context else len(shots['shots']) > 0)].shape[0]
     winners_rate = winners / total_points_with_return
 
     # escludo dai total points quelli per cui non c'è stata risposta
     unforced_errors_rate = \
-        shots[(shots['shots'].apply(len) > 1) & (shots['outcome'].str.contains(r'\#', regex=True)) & (
+        shots[(len(shots['shots']) > 1 if "on serve" in context else len(shots['shots']) > 0) & (shots['outcome'].str.contains(r'\@', regex=True)) & (
                 shots['won_by_player'] == False)].shape[
             0] / total_points_with_return
 
@@ -222,7 +223,6 @@ def build_generic_features(player, context, shots):
         return generic_features | {'average_response_depth': avg_resp_depth}
 
 
-# todo: fare attenzione alla normalizzazione, che la somma di tutti i rate faccia 1 (ora non lo è perchè alcuni colpi non vengono considerati)
 def build_opening_phase_features(context, filtered_shots):
     """
     Estrae feature sulle categorie di colpi nei primi SHOT_LENGTH (tipicamente 3) colpi della sequenza.
