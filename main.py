@@ -44,7 +44,7 @@ def main():
         file_path = os.path.join(output_dir, f"{safe_name}.csv")
 
         # Salva il DataFrame in formato CSV
-        df.to_csv(file_path, index=False)
+        df.to_csv(file_path, index=True)
         print(f"Salvato: {file_path}")
 
     #print(run_clustering(feature_dataset))

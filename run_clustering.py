@@ -59,7 +59,7 @@ def run_kmeans_clustering(df, n_clusters=3, visualize=True, umap_comp=5):
     print(f"silhouette = {score:.3f}")
 
     # Calcolo del DBI
-    dbi = davies_bouldin_score(X_umap, cluster_labels)
+    dbi = davies_bouldin_score(X_reduced, cluster_labels)
     print(f"Dbi score (Agglomerative + UMAP): {dbi:.3f}")
 
     # 5. PCA per visualizzazione
