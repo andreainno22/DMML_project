@@ -1,9 +1,35 @@
+import os
 from typing import Dict, List, Tuple, Counter
 import seaborn as sns
 import pandas as pd
 from matplotlib import pyplot as plt
 from sklearn.metrics import pairwise_distances
 import numpy as np
+
+cluster_description = {"on response_ on clay, cluster 0": "Defensive, consistent from the baseline.",
+                       "on response_ on clay, cluster 1": "Aggressive since the response, variety of shots, high number of net discents",
+                       "on response_ on clay, cluster 2": "High-risk, aggressive baseliner, high usage of dropshot, not good responder to the service",
+                       "on response_ on clay, cluster 3": "Excelent service responder, conservative and low error-prone, high number of net discents",
+                       "on response_ on grass, cluster 0": "High-risk, aggressive baseliner, high usage of dropshot",
+                       "on response_ on grass, cluster 1": "Defensive, consistent from the baseline, sufference in the net descents",
+                       "on response_ on grass, cluster 2": "Very good responder to the service, very good in net points but low net descents, low-risk point builder",
+                       "on response_ on grass, cluster 3": "Aggressive, low error-prone, bad service responder",
+                       "on response_ on hard, cluster 0": "Defensive, untouchable from the baseline, low error-prone, dropshots user",
+                       "on response_ on hard, cluster 1": "High-risk, aggressive baseliner, he tries to shorten the point",
+                       "on response_ on hard, cluster 2": "Aggressive but low error-prone, low usage of slice shots",
+                       "on response_ on hard, cluster 3": "Defensive, slice constructor, high number net discents",
+                       "on serve_ on clay, cluster 0": "Aggressive, high-risk from the baseline",
+                       "on serve_ on clay, cluster 1": "Defensive, low-risk from the baseline",
+                       "on serve_ on clay, cluster 2": "Defensive, low-risk, variety of shots",
+                       "on serve_ on clay, cluster 3": "Big server, serve and volley user",
+                       "on serve_ on grass, cluster 0":"Error-prone, not big server",
+                       "on serve_ on grass, cluster 1":"Good server, silce user, serve and volley user",
+                       "on serve_ on grass, cluster 2":"Defensive, low error-prone, baseline builder",
+                       "on serve_ on grass, cluster 3":"Big server, aggressive",
+                       "on serve_ on hard, cluster 0":"Big server, aggressive",
+                       "on serve_ on hard, cluster 1":"Good server, serve and volley user",
+                       "on serve_ on hard, cluster 2":"Defensive, low-risk, variety of shots",
+                       "on serve_ on hard, cluster 3":"Not a big server, defensive"}
 
 
 def aggregate_features_by_cluster(df_clustered: pd.DataFrame, cluster_col='cluster', agg_funcs=None):
@@ -58,7 +84,8 @@ def cluster_feature_deltas(df, cluster_col='cluster'):
     return deltas
 
 
-def analyze_cluster_profiles(df, cluster_col='cluster', point_context="on serve", top_n=5, cluster_id=None, all_players=False):
+def analyze_cluster_profiles(df, context, cluster_col='cluster', top_features=False, cluster_id=None,
+                             all_players=False):
     """
     Analizza i profili dei cluster e stampa le feature più importanti.
 
@@ -67,7 +94,7 @@ def analyze_cluster_profiles(df, cluster_col='cluster', point_context="on serve"
         cluster_col (str): Nome della colonna che contiene le etichette dei cluster.
         top_n (int): Numero di feature più importanti da stampare per cluster.
         :param cluster_id:
-        :param point_context:
+        :param context:
     """
 
     deltas = cluster_feature_deltas(df, cluster_col)
@@ -75,47 +102,59 @@ def analyze_cluster_profiles(df, cluster_col='cluster', point_context="on serve"
     # Calcola la deviazione standard di ogni feature sull'intero dataset
     feature_std = df.drop(columns=[cluster_col, 'player']).std()
 
+    # calcola la media di ogni feature nell'intero dataset
+    feature_mean = df.drop(columns=[cluster_col, 'player']).mean()
+
     if cluster_id is not None:
         deltas = deltas[deltas.index == cluster_id]
 
     for cluster in deltas.index:
-        print(f"\n--- Cluster {cluster} ---")
+        key = context+f", cluster {cluster}"
+        print(f"\n--- Cluster {cluster} ---\n {cluster_description[key]}")
         cluster_deltas = deltas.loc[cluster]
 
         # Normalizza le deviazioni usando Z-score
         normalized_deltas = cluster_deltas / feature_std
+        deltas_in_percentage = cluster_deltas / feature_mean
 
         # Ordina le deviazioni normalizzate per valore assoluto
-        important_features = normalized_deltas.abs().sort_values(ascending=False)
-        describing_features = ['average_shot_length', 'net_points_rate',
-                               'net_points_won_rate', 'winners_rate',
-                               'unforced_errors_rate', 'slices_rate',
-                               'dropshots_rate']
-        if point_context == "on response":
-            describing_features.append('average_response_depth')
+        if top_features is False:
+            describing_features = ['average_shot_length', 'net_points_rate',
+                                   'net_points_won_rate', 'winners_rate',
+                                   'unforced_errors_rate', 'slices_rate',
+                                   'dropshots_rate']
+            if "on response" in context:
+                describing_features.append('average_response_depth')
+            else:
+                describing_features.append('ace_rate')
+
+            # stampa di quanto le features del centroide del cluster si discostano dalla media generale
+            for feature in describing_features:
+                if feature in deltas_in_percentage:
+                    delta = deltas_in_percentage[feature]
+                    sign = "+" if delta > 0 else "-"
+                    print(f"  {feature}: {sign} {abs(delta):.4f}")
         else:
-            describing_features.append('ace_rate')
-        # print(f"Feature più importanti (top {top_n}):")
-        # for feature, delta in important_features.head(top_n).items():
-        #   sign = "+" if normalized_deltas[feature] > 0 else "-"
-        #   print(f"  {feature}: {sign} {delta:.4f}")
-        for feature in describing_features:
-            if feature in normalized_deltas:
-                delta = normalized_deltas[feature]
+            top_n = 5
+            important_features = normalized_deltas.abs().sort_values(ascending=False)
+            print(f"Most important features for cluster {cluster}:")
+            for feature, _ in important_features.head(top_n).items():
+                delta = deltas_in_percentage[feature]
                 sign = "+" if delta > 0 else "-"
-                print(f"  {feature}: {sign} {abs(delta):.4f}")
+                print(f"  {feature}: {sign} {delta:.4f}")
 
         if all_players:
             # Ottieni e stampa i giocatori nel cluster corrente
             players_in_cluster = df[df[cluster_col] == cluster]['player'].unique().tolist()
-            print(f"\nGiocatori nel Cluster {cluster}:")
-            if players_in_cluster:
-                for player_name in players_in_cluster:
-                    print(f"  - {player_name}")
-            else:
-                print("  Nessun giocatore trovato per questo cluster.")
+            print(f"\nPlayers in the cluster {cluster}:")
         else:
-            #todo stampare i primi 5 giocatori da file
+            # stampa solo i 5 giocatori più importanti del cluster
+            file_path = os.path.join('../top_players_per_context/', f"{context}, cluster {cluster}")
+            players_in_cluster_df = pd.read_csv(file_path, low_memory=False)
+            players_in_cluster = players_in_cluster_df['player'].tolist()
+            print(f"\nTop players in the cluster {cluster}:")
+        for player_name in players_in_cluster:
+            print(f"  - {player_name}")
 
 
 def calculate_centroid_similarity(
@@ -272,12 +311,12 @@ def find_closest_cluster_triplets(
                 cluster_b = triplet[j]
                 # trovo la similarità tra cluster_a e cluster_b nel dataframe
                 similarity_row = similarity_df[((similarity_df['context1'] == cluster_a[0]) & (
-                            similarity_df['cluster1'] == cluster_a[1]) & (similarity_df['context2'] == cluster_b[0]) & (
-                                                            similarity_df['cluster2'] == cluster_b[1])) | (
-                                                           (similarity_df['context1'] == cluster_b[0]) & (
-                                                               similarity_df['cluster1'] == cluster_b[1]) & (
-                                                                       similarity_df['context2'] == cluster_a[0]) & (
-                                                                       similarity_df['cluster2'] == cluster_a[1]))]
+                        similarity_df['cluster1'] == cluster_a[1]) & (similarity_df['context2'] == cluster_b[0]) & (
+                                                        similarity_df['cluster2'] == cluster_b[1])) | (
+                                                       (similarity_df['context1'] == cluster_b[0]) & (
+                                                       similarity_df['cluster1'] == cluster_b[1]) & (
+                                                               similarity_df['context2'] == cluster_a[0]) & (
+                                                               similarity_df['cluster2'] == cluster_a[1]))]
                 if not similarity_row.empty:
                     similarities_in_triplet.append(similarity_row['similarity'].values[0])
         return np.mean(similarities_in_triplet) if similarities_in_triplet else 0  # Return 0 if no similarities found
@@ -334,7 +373,7 @@ def visualize_similarity_matrix(
 
 
 def create_player_trajectories(
-        clustered_data:List[Tuple[str, pd.DataFrame]],
+        clustered_data: List[Tuple[str, pd.DataFrame]],
 ) -> Dict[str, List[Tuple[str, int]]]:
     """
     Crea le traiettorie dei giocatori attraverso i cluster nei diversi contesti.
@@ -389,7 +428,8 @@ def visualize_player_trajectory(
         player: str,
         dfs_clustered: List[Tuple[str, pd.DataFrame]],  # Aggiungi il DataFrame come parametro
         cluster_col: str = 'cluster',  # Aggiungi cluster_col come parametro
-    ):
+        top_features: bool = False,
+):
     """
     Visualizza la traiettoria del giocatore utilizzando i profili dei cluster.
 
@@ -400,15 +440,16 @@ def visualize_player_trajectory(
         :param dfs_clustered:
     """
     if player not in player_trajectories:
-        print(f"Giocatore {player} non trovato.")
+        print(f"Player {player} not found.")
         return
 
     trajectory = player_trajectories[player]
-    print(f"Traiettoria del Giocatore {player}:")
-    for i, (context, cluster) in enumerate(trajectory):
-        print(f"Passo {i + 1}: Contesto = {context}, Cluster = {cluster}")
+    print(f"Player trajectory for {player}:\n")
+    for context, cluster in trajectory:
+        context_cleaned = context.replace(".csv", "")
+        context_to_print = context_cleaned.replace("_", "")
+        print(f"\nContext = {context_to_print}, Cluster = {cluster}")
         df = next(df for ctx, df in dfs_clustered if ctx == context)
-        # Filtra il DataFrame per il cluster corrente
-        cluster_df = df[df[cluster_col] == cluster]
         # Analizza il profilo del cluster
-        analyze_cluster_profiles(df, cluster_col, "on serve" if "on serve" in context else "on response", cluster_id = cluster)
+        analyze_cluster_profiles(df, top_features=top_features, context=context_cleaned, cluster_col=cluster_col,
+                                 cluster_id=cluster)

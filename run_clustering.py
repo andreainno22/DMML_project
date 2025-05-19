@@ -22,8 +22,6 @@ warnings.filterwarnings(
 )
 
 
-
-# todo: standardizzare e normalizzare tutte le features
 def run_kmeans_clustering(df, n_clusters=3, visualize=True, umap_comp=5):
     context_cols = ['player']
     feature_cols = [col for col in df.columns if col not in context_cols]
@@ -33,11 +31,9 @@ def run_kmeans_clustering(df, n_clusters=3, visualize=True, umap_comp=5):
     # X_high_var = selector.fit_transform(df[feature_cols])
     # selected_features = [col for col, var in zip(feature_cols, selector.variances_) if var > 0.005]
 
-    # 2. Standardizzazione
+    # 2. Standardizzazione con z-score
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(df[feature_cols])
-
-    print(feature_cols)
 
     # PCA con n componenti scelte in base alla varianza spiegata
     # pca = PCA(n_components=0.9)  # Mantieni abbastanza PC da spiegare il 90% della varianza
@@ -56,23 +52,23 @@ def run_kmeans_clustering(df, n_clusters=3, visualize=True, umap_comp=5):
 
     # 4. Valutazione silhouette
     score = silhouette_score(X_reduced, cluster_labels)
-    print(f"silhouette = {score:.3f}")
+    print(f"Silhouette score (KMeans + UMAP): {score:.3f}")
 
     # Calcolo del DBI
     dbi = davies_bouldin_score(X_reduced, cluster_labels)
-    print(f"Dbi score (Agglomerative + UMAP): {dbi:.3f}")
+    print(f"Dbi score (KMeans + UMAP): {dbi:.3f}")
 
     # 5. PCA per visualizzazione
     if visualize:
-        pca = PCA(n_components=2)
-        X_pca = pca.fit_transform(X_reduced)
+        #pca = PCA(n_components=2)
+        #X_pca = pca.fit_transform(X_reduced)
         plt.figure(figsize=(8, 6))
         for cluster_id in range(n_clusters):
             idx = df_with_clusters['cluster'] == cluster_id
-            plt.scatter(X_pca[idx, 0], X_pca[idx, 1], label=f"Cluster {cluster_id}", alpha=0.7)
-        plt.title("Clustering dei profili di gioco (PCA)")
-        plt.xlabel("PCA 1")
-        plt.ylabel("PCA 2")
+            plt.scatter(X_reduced[idx, 0], X_reduced[idx, 1], label=f"Cluster {cluster_id}", alpha=0.7)
+        plt.title("Clustering of game profiles (UMAP)")
+        plt.xlabel("UMAP 1")
+        plt.ylabel("UMAP 2")
         plt.legend()
         plt.grid(True)
         plt.tight_layout()
