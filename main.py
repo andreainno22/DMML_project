@@ -19,8 +19,6 @@ def main():
     """
     Main function to execute the script.
     """
-    # vorrei applicare freq_seq_enum a un dataframe, dove gli itemset sono i colpi, codificati come nella funzione decode_point, e una sequenza è un punto intero.
-    # Per ogni punto, decodifico i colpi e creo una sequenza di colpi
     df = pd.read_csv('points_datasets/charting-m-points-2020s.csv', low_memory=False)
 
     feature_datasets = get_final_datasets(df)
@@ -50,3 +48,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# todo: spiegare umap
+# todo: ritestare gli altri metodi oltre a kmeans
+# todo: capire se utilizzare i pattern frequenti come features per spiegare il cluster

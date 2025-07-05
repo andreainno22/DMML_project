@@ -16,6 +16,8 @@ def get_service_points_df(player, df, surface):
     """
     # Filtro per estrarre i punti in cui il giocatore gioca su una superficie specifica
     player_df = df[(df['match_id'].str.contains(player)) & (df['surface'] == surface)]
+    if player_df is None:
+        return None
     # Filtro per estrarre i punti in cui il giocatore gioca come 1st player
     df_1st_player = player_df[player_df['match_id'].str.contains(player + '-')]
 
@@ -55,6 +57,8 @@ def get_response_points_df(player, df, surface):
     """
     # Filtro per estrarre i punti in cui il giocatore è coinvolto
     player_df = df[df['match_id'].str.contains(player) & (df['surface'] == surface)]
+    if player_df is None:
+        return None
 
     # Filtro per estrarre i punti in cui il giocatore gioca come 1st player
     df_1st_player = player_df[player_df['match_id'].str.contains(player + '-')]

@@ -11,36 +11,59 @@ from sklearn.metrics import silhouette_score
 from sklearn.metrics import davies_bouldin_score
 from random import sample
 from numpy.random import uniform
+import umap
 import warnings
 
-# Alternativa più generica se il valore di n_jobs nel messaggio può variare
+# Ignore this warning
 warnings.filterwarnings(
     action='ignore',
-    message="overridden to 1 by setting random_state. Use no seed for parallelism.", # Parte più generica del messaggio
+    message="overridden to 1 by setting random_state. Use no seed for parallelism.",
     category=UserWarning,
     module='umap.umap_'
 )
+
+def continuity(X_high, X_low, n_neighbors=5):
+    n = X_high.shape[0]
+
+    knn_high = NearestNeighbors(n_neighbors=n_neighbors + 1).fit(X_high)
+    indices_high = knn_high.kneighbors(return_distance=False)[:, 1:]
+
+    knn_low = NearestNeighbors(n_neighbors=n_neighbors + 1).fit(X_low)
+    indices_low = knn_low.kneighbors(return_distance=False)[:, 1:]
+
+    ranks = np.full((n, n), fill_value=n+1, dtype=int)
+    for i in range(n):
+        for rank, j in enumerate(indices_high[i]):
+            ranks[i, j] = rank + 1
+
+    sum_penalty = 0
+    for i in range(n):
+        for j in indices_low[i]:
+            if j not in indices_high[i]:
+                sum_penalty += ranks[i, j] - n_neighbors
+
+    denom = n * n_neighbors * (2 * n - 3 * n_neighbors - 1)
+    continuity_score = 1 - (2 * sum_penalty / denom)
+
+    return max(0.0, min(1.0, continuity_score))
+
+
 
 
 def run_kmeans_clustering(df, n_clusters=3, visualize=True, umap_comp=5):
     context_cols = ['player']
     feature_cols = [col for col in df.columns if col not in context_cols]
 
-    # 1. Filtro a bassa varianza
-    # selector = VarianceThreshold(threshold=0.005)
-    # X_high_var = selector.fit_transform(df[feature_cols])
-    # selected_features = [col for col, var in zip(feature_cols, selector.variances_) if var > 0.005]
-
-    # 2. Standardizzazione con z-score
+    # 1. z-score normalization
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(df[feature_cols])
 
     # PCA con n componenti scelte in base alla varianza spiegata
-    # pca = PCA(n_components=0.9)  # Mantieni abbastanza PC da spiegare il 90% della varianza
-    # X_reduced = pca.fit_transform(X_scaled)
+    pca = PCA(n_components=0.8)  # Mantieni abbastanza PC da spiegare l' 80% della varianza
+    X_reduced = pca.fit_transform(X_scaled)
     # 2. Riduzione dimensionale con UMAP per clustering
-    reducer = umap.UMAP(n_components=umap_comp, random_state=42)
-    X_reduced = reducer.fit_transform(X_scaled)
+    #reducer = umap.UMAP(n_components=umap_comp, random_state=42)
+    #X_reduced = reducer.fit_transform(X_scaled)
     print(len(X_reduced[0]))
 
     # 3. KMeans
@@ -60,12 +83,13 @@ def run_kmeans_clustering(df, n_clusters=3, visualize=True, umap_comp=5):
 
     # 5. PCA per visualizzazione
     if visualize:
-        #pca = PCA(n_components=2)
-        #X_pca = pca.fit_transform(X_reduced)
+        pca = PCA(n_components=2)
+        X_pca = pca.fit_transform(X_reduced)
         plt.figure(figsize=(8, 6))
         for cluster_id in range(n_clusters):
             idx = df_with_clusters['cluster'] == cluster_id
-            plt.scatter(X_reduced[idx, 0], X_reduced[idx, 1], label=f"Cluster {cluster_id}", alpha=0.7)
+            plt.scatter(X_pca[idx, 0], X_pca[idx, 1], label=f"Cluster {cluster_id}", alpha=0.7)
+            #plt.scatter(X_reduced[idx, 0], X_reduced[idx, 1], label=f"Cluster {cluster_id}", alpha=0.7)
         plt.title("Clustering of game profiles (UMAP)")
         plt.xlabel("UMAP 1")
         plt.ylabel("UMAP 2")
@@ -204,12 +228,11 @@ def explained_variance_from_features(df):
         print(f"PC{i}: {ratio:.4f} ({cumulative_var[i - 1]:.4f} cumulativa)")
 
 
-import umap
 from sklearn.mixture import GaussianMixture
 
 
-def run_umap_gmm_clustering(df, context_cols=None, n_clusters=3, n_neighbors=15, min_dist=0.1,
-                            proba_threshold=0.9, visualize=True):
+def run_umap_gmm_clustering(df, context_cols=None, n_clusters=4,
+                            proba_threshold=0.9, visualize=True, umap_dim=2):
     """
     Applica UMAP per riduzione + GMM per clustering, con gestione dei punti ambigui come rumore.
 
@@ -240,7 +263,7 @@ def run_umap_gmm_clustering(df, context_cols=None, n_clusters=3, n_neighbors=15,
     X_scaled = scaler.fit_transform(X_high_var)
 
     # 3. UMAP
-    reducer = umap.UMAP(n_components=8, n_neighbors=n_neighbors, min_dist=min_dist, random_state=42)
+    reducer = umap.UMAP(n_components=umap_dim)
     X_umap = reducer.fit_transform(X_scaled)
 
     # 4. GMM
@@ -250,20 +273,17 @@ def run_umap_gmm_clustering(df, context_cols=None, n_clusters=3, n_neighbors=15,
     max_probs = cluster_probs.max(axis=1)
     predicted_labels = gmm.predict(X_umap)
 
-    print(predicted_labels, len(predicted_labels))
-    print(max_probs, len(max_probs))
-
     # Applica soglia → rumore se bassa confidenza
     cluster_labels = np.where(max_probs < proba_threshold, -1, predicted_labels)
 
     import seaborn as sns
-    sns.histplot(max_probs, bins=20)
-    plt.title("Distribuzione massima probabilità di appartenenza GMM")
-    plt.show()
+    if visualize:
+        sns.histplot(max_probs, bins=20)
+        plt.title("Distribuzione massima probabilità di appartenenza GMM")
+        plt.show()
 
     # 5. Silhouette solo sui punti validi
     valid_mask = cluster_labels != -1
-    print(cluster_labels, len(cluster_labels))
     if valid_mask.sum() > 1:
         sil_score = silhouette_score(X_umap[valid_mask], cluster_labels[valid_mask])
         print(f"Silhouette score (UMAP + GMM, validi): {sil_score:.3f}")
@@ -313,7 +333,7 @@ def run_umap_hdbscan_clustering(df, context_cols=None, min_cluster_size=5, visua
     if context_cols is None:
         context_cols = []
 
-    # 1. Prepara i dati
+    # 1. Z-score normalization
     feature_cols = [col for col in df.columns if col not in context_cols]
     X = df[feature_cols].values
     X_scaled = StandardScaler().fit_transform(X)
@@ -326,8 +346,8 @@ def run_umap_hdbscan_clustering(df, context_cols=None, min_cluster_size=5, visua
     clusterer = hdbscan.HDBSCAN(min_cluster_size=min_cluster_size, prediction_data=True)
     cluster_labels = clusterer.fit_predict(X_umap)
 
-    score = silhouette_score(X_umap, cluster_labels)
-    print(f"Silhouette score (UMAP + HDBSCAN): {score:.3f}")
+    sil_score = silhouette_score(X_umap, cluster_labels)
+    print(f"Silhouette score (UMAP + HDBSCAN): {sil_score:.3f}")
 
     # 4. Visualizzazione
     if visualize:
@@ -347,7 +367,7 @@ def run_umap_hdbscan_clustering(df, context_cols=None, min_cluster_size=5, visua
     # 5. Restituisci il DataFrame con etichette
     df_clustered = df.copy()
     df_clustered['cluster'] = cluster_labels
-    return df_clustered
+    return df_clustered, sil_score
 
 
 from sklearn.cluster import AgglomerativeClustering
@@ -378,25 +398,28 @@ def run_umap_agglomerative_clustering(df, context_cols=None, n_clusters=3,
     X_scaled = StandardScaler().fit_transform(X)
 
     # 2. Riduzione dimensionale con UMAP per clustering
-    reducer = umap.UMAP(n_components=n_components_umap, random_state=42)
-    X_umap = reducer.fit_transform(X_scaled)
+    #reducer = umap.UMAP(n_components=n_components_umap, random_state=42)
+    #X_reduced = reducer.fit_transform(X_scaled)
+
+    pca = PCA(n_components=0.8)  # Mantieni abbastanza PC da spiegare l' 80% della varianza
+    X_reduced = pca.fit_transform(X_scaled)
 
     # 3. Agglomerative Clustering
     agglom = AgglomerativeClustering(n_clusters=n_clusters, linkage=linkage)
-    cluster_labels = agglom.fit_predict(X_umap)
+    cluster_labels = agglom.fit_predict(X_reduced)
 
     # 4. Silhouette score
-    sil_score = silhouette_score(X_umap, cluster_labels)
+    sil_score = silhouette_score(X_reduced, cluster_labels)
     print(f"Silhouette score (Agglomerative + UMAP): {sil_score:.3f}")
 
     # Calcolo del DBI
-    dbi = davies_bouldin_score(X_umap, cluster_labels)
+    dbi = davies_bouldin_score(X_reduced, cluster_labels)
     print(f"Dbi score (Agglomerative + UMAP): {dbi:.3f}")
 
     # 5. Visualizzazione 2D (con nuova UMAP a 2D solo per visual)
     if visualize:
         reducer_2d = umap.UMAP(n_components=2, random_state=42)
-        X_2d = reducer_2d.fit_transform(X_scaled)
+        X_2d = reducer_2d.fit_transform(X_reduced)
         plt.figure(figsize=(8, 6))
         for label in np.unique(cluster_labels):
             idx = cluster_labels == label
@@ -415,8 +438,8 @@ def run_umap_agglomerative_clustering(df, context_cols=None, n_clusters=3,
     return df_clustered, sil_score, dbi
 
 
-def run_umap_optics_clustering(df, reduction='umap', context_cols=None, min_pts=7, xi=0.08,
-                               min_cluster_size=0.5, visualize=True, noise_perc=0.60):
+def run_umap_optics_clustering(df, reduction='umap', context_cols=None, min_pts=4, xi=0.08,
+                               min_cluster_size=0.1, visualize=True, noise_perc=0.60):
     """
     Execute dimensionality reduction and OPTICS clustering on a dataset. The function
     supports both UMAP and PCA for dimensionality reduction. It generates various
@@ -442,12 +465,14 @@ def run_umap_optics_clustering(df, reduction='umap', context_cols=None, min_pts=
         context_cols = []
 
     feature_cols = [col for col in df.columns if col not in context_cols]
+
+    # z-score normalization
     X = df[feature_cols].values
     X_scaled = StandardScaler().fit_transform(X)
 
-    # ↓ Riduzione dimensionale
+    # Riduzione dimensionale
     if reduction == 'umap':
-        reducer = umap.UMAP(n_components=5)#, random_state=42)
+        reducer = umap.UMAP(n_components=10)#, random_state=42)
         X_reduced = reducer.fit_transform(X_scaled)
     elif reduction == 'pca':
         pca = PCA(n_components=0.9)
@@ -455,15 +480,15 @@ def run_umap_optics_clustering(df, reduction='umap', context_cols=None, min_pts=
     else:
         X_reduced = X_scaled
 
-    # ↓ OPTICS clustering
+    # OPTICS clustering
     optics = OPTICS(min_samples=min_pts, xi=xi, min_cluster_size=min_cluster_size)
     cluster_labels = optics.fit_predict(X_reduced)
 
     n_clusters = len(set(cluster_labels)) - (1 if -1 in cluster_labels else 0)
-
+    print(n_clusters)
     if n_clusters != 1:
         print(f"OPTICS ha trovato {n_clusters} cluster")
-        # ↓ Silhouette
+        # Silhouette
         valid_mask = cluster_labels != -1
         # se il numero dei punti non di rumore maggiore di noise_perc allora calcolo lo score
         if valid_mask.sum() < df.shape[0] * noise_perc:
@@ -472,10 +497,10 @@ def run_umap_optics_clustering(df, reduction='umap', context_cols=None, min_pts=
             print(valid_mask.sum(), df.shape[0]*(1-noise_perc))
         else:
             print("Troppi punti classificati come rumore per calcolare il silhouette score")
-            visualize = False
+            visualize = True
             print(valid_mask.sum(), df.shape[0]*(1-noise_perc))
     else:
-        visualize = False
+        visualize = True
 
     if visualize:
         # Visualizzazione 2D

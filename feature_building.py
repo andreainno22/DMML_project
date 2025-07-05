@@ -344,7 +344,6 @@ def build_opening_phase_features(context, filtered_shots):
     # --- Fine Assicura Chiavi Mancanti ---
 
 
-# todo: da aggiungere i bag of patterns (se utili)
 def build_final_dataset(all_features_by_context):
     """
     Costruisce un dizionario di DataFrame, uno per ogni contesto base,
@@ -383,11 +382,4 @@ def build_final_dataset(all_features_by_context):
             # Se non ci sono features per un contesto, crea un DataFrame vuoto
             print(f"Attenzione: Nessuna feature trovata per il contesto '{base_context}'")
             final_datasets[base_context] = pd.DataFrame()  # Ritorna un DF vuoto
-    counts = []
-
-    # conta per contesto il numero di giocatori che non hanno info sulla profondità della risposta
-    for context, df in final_datasets.items():
-        if "on response" in context:
-            counts.append(df['average_response_depth'].isna().sum())
-    print(f"Numero totale di NaN in average_response_depth: {counts}")
     return final_datasets
