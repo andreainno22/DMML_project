@@ -78,13 +78,13 @@ def cluster_feature_deltas(df, cluster_col='cluster'):
     # Calcola il centroide di ogni cluster (media delle feature per cluster)
     cluster_means = df.groupby(cluster_col).mean(numeric_only=True)
 
-    # Calcola le deviazioni
-    deltas = cluster_means - mean_all
+    # Calcola le deviazioni in percentuale
+    deltas_percent = (cluster_means - mean_all) / mean_all
 
-    return deltas
+    return deltas_percent
 
 
-def analyze_cluster_profiles(df, context, cluster_col='cluster', top_features=False, cluster_id=None,
+def analyze_cluster_profiles(df, context, cluster_col='cluster', cluster_id=None,
                              all_players=False):
     """
     Analizza i profili dei cluster e stampa le feature più importanti.
@@ -92,12 +92,11 @@ def analyze_cluster_profiles(df, context, cluster_col='cluster', top_features=Fa
     Parameters:
         df (pd.DataFrame): Dataset con le feature e le etichette di cluster.
         cluster_col (str): Nome della colonna che contiene le etichette dei cluster.
-        top_n (int): Numero di feature più importanti da stampare per cluster.
         :param cluster_id:
         :param context:
     """
 
-    deltas = cluster_feature_deltas(df, cluster_col)
+    deltas_in_percentage = cluster_feature_deltas(df, cluster_col)
 
     # Calcola la deviazione standard di ogni feature sull'intero dataset
     feature_std = df.drop(columns=[cluster_col, 'player']).std()
@@ -106,42 +105,29 @@ def analyze_cluster_profiles(df, context, cluster_col='cluster', top_features=Fa
     feature_mean = df.drop(columns=[cluster_col, 'player']).mean()
 
     if cluster_id is not None:
-        deltas = deltas[deltas.index == cluster_id]
+        deltas_in_percentage = deltas_in_percentage[deltas_in_percentage.index == cluster_id]
 
-    for cluster in deltas.index:
+    for cluster in deltas_in_percentage.index:
         key = context+f", cluster {cluster}"
         print(f"\n--- Cluster {cluster} ---\n {cluster_description[key]}")
-        cluster_deltas = deltas.loc[cluster]
-
-        # Normalizza le deviazioni usando Z-score
-        normalized_deltas = cluster_deltas / feature_std
-        deltas_in_percentage = cluster_deltas / feature_mean
+        cluster_deltas = deltas_in_percentage.loc[cluster]
 
         # Ordina le deviazioni normalizzate per valore assoluto
-        if top_features is False:
-            describing_features = ['average_shot_length', 'net_points_rate',
-                                   'net_points_won_rate', 'winners_rate',
-                                   'unforced_errors_rate', 'slices_rate',
-                                   'dropshots_rate']
-            if "on response" in context:
-                describing_features.append('average_response_depth')
-            else:
-                describing_features.append('ace_rate')
-
-            # stampa di quanto le features del centroide del cluster si discostano dalla media generale
-            for feature in describing_features:
-                if feature in deltas_in_percentage:
-                    delta = deltas_in_percentage[feature]
-                    sign = "+" if delta > 0 else "-"
-                    print(f"  {feature}: {sign} {abs(delta):.4f}")
+        describing_features = ['average_shot_length', 'net_points_rate',
+                               'net_points_won_rate', 'winners_rate',
+                               'unforced_errors_rate', 'slices_rate',
+                               'dropshots_rate']
+        if "on response" in context:
+            describing_features.append('average_response_depth')
         else:
-            top_n = 5
-            important_features = normalized_deltas.abs().sort_values(ascending=False)
-            print(f"Most important features for cluster {cluster}:")
-            for feature, _ in important_features.head(top_n).items():
-                delta = deltas_in_percentage[feature]
+            describing_features.append('ace_rate')
+
+        # stampa di quanto le features del centroide del cluster si discostano dalla media generale
+        for feature in describing_features:
+            if feature in deltas_in_percentage:
+                delta = cluster_deltas[feature]
                 sign = "+" if delta > 0 else "-"
-                print(f"  {feature}: {sign} {delta:.4f}")
+                print(f"  {feature}: {sign} {abs(delta):.4f}")
 
         if all_players:
             # Ottieni e stampa i giocatori nel cluster corrente
@@ -149,7 +135,7 @@ def analyze_cluster_profiles(df, context, cluster_col='cluster', top_features=Fa
             print(f"\nPlayers in the cluster {cluster}:")
         else:
             # stampa solo i 5 giocatori più importanti del cluster
-            file_path = os.path.join('../top_players_per_context/', f"{context}, cluster {cluster}")
+            file_path = os.path.join('top_players_per_context', f"{context}, cluster {cluster}")
             players_in_cluster_df = pd.read_csv(file_path, low_memory=False)
             players_in_cluster = players_in_cluster_df['player'].tolist()
             print(f"\nTop players in the cluster {cluster}:")
@@ -225,106 +211,6 @@ def calculate_centroid_similarity(
     return similarity_df
 
 
-def find_closest_cluster_triplets(
-        similarity_df: pd.DataFrame,
-        contexts: List[str]
-        # Lista dei contesti considerati, es: ["on serve - grass", "on serve - clay", "on serve - hard"]
-) -> List[Tuple[Tuple[str, int], Tuple[str, int], Tuple[str, int]]]:
-    """
-    Trova le terzine di cluster più simili (massima similarità) all'interno di un singolo DataFrame di similarità.
-    Per ogni riga del DataFrame, trova i due cluster (tra quelli specificati in 'contexts')
-    con la similarità più alta rispetto al cluster della riga corrente, assicurandosi che i due cluster
-    siano di contesti diversi dal cluster della riga corrente.
-
-    Parameters:
-        similarity_df (pd.DataFrame): DataFrame di similarità.
-            Deve avere le colonne 'context1', 'cluster1', 'context2', 'cluster2', 'similarity'.
-        contexts (List[str]): Lista dei contesti da considerare.
-            Ad esempio, se si vuole trovare le terzine tra 'on serve - grass',
-            'on serve - clay' e 'on serve - hard', la lista sarà
-            ["on serve - grass", "on serve - clay", "on serve - hard"].
-
-    Returns:
-        List[Tuple[Tuple[str, int], Tuple[str, int], Tuple[str, int]]]:
-            Lista di terzine di cluster, ordinate per similarità decrescente.
-            Ogni terzina è una tupla di tuple, dove ogni tupla interna rappresenta un cluster
-            (contesto, numero del cluster).
-            Ad esempio:
-            [
-                (('on serve - grass', 0), ('on serve - clay', 1), ('on serve - hard', 2)),
-                ...
-            ]
-            Se non ci sono terzine possibili, restituisce una lista vuota.
-    """
-
-    closest_triplets = []
-    for index, row in similarity_df.iterrows():
-        # Seleziona il cluster e il contesto della riga corrente
-        context1 = row['context1']
-        cluster1 = row['cluster1']
-        cluster_1_tuple = (context1, cluster1)
-
-        # Trova le similarità con gli altri cluster *entro i contesti specificati*
-        similarities = []
-        for other_index, other_row in similarity_df.iterrows():
-            if index != other_index:
-                # considero solo le righe che hanno context1 o context2 uguale a context1 della riga di partenza.
-                if other_row['context1'] == context1:
-                    other_cluster = (other_row['context2'], other_row['cluster2'])
-                    similarity = other_row['similarity']
-                    if other_row['context2'] in contexts and other_row[
-                        'context2'] != context1:  # aggiungo il controllo sul contesto
-                        similarities.append((other_cluster, similarity))
-                elif other_row['context2'] == context1:
-                    other_cluster = (other_row['context1'], other_row['cluster1'])
-                    similarity = other_row['similarity']
-                    if other_row['context1'] in contexts and other_row[
-                        'context1'] != context1:  # aggiungo il controllo sul contesto
-                        similarities.append((other_cluster, similarity))
-
-        if len(similarities) < 2:
-            continue  # Non ci sono abbastanza cluster con cui confrontare
-
-        # Trova i due cluster più simili
-        most_similar_clusters = sorted(similarities, key=lambda x: x[1], reverse=True)[:2]
-
-        # Verifica che i contesti siano diversi
-        if most_similar_clusters[0][0][0] == context1 or most_similar_clusters[1][0][0] == context1 or \
-                most_similar_clusters[0][0][0] == most_similar_clusters[1][0][0]:
-            continue  # Se i contesti non sono diversi, salta questa terzina
-
-        cluster_2_tuple = most_similar_clusters[0][0]
-        cluster_3_tuple = most_similar_clusters[1][0]
-        # ordino i cluster per avere sempre lo stesso ordine nella terzina
-        triplet = tuple(sorted([cluster_1_tuple, cluster_2_tuple, cluster_3_tuple]))
-        if triplet not in closest_triplets:
-            closest_triplets.append(triplet)
-
-    # Ordina le terzine per similarità decrescente (somma delle similarità)
-    # Nota: questa parte è un po' più complessa perché le similarità sono tra coppie, non terzine.
-    # Qui ordiniamo le terzine in base alla similarità media delle coppie che la compongono
-    def triplet_similarity(triplet):
-        similarities_in_triplet = []
-        for i in range(3):
-            for j in range(i + 1, 3):
-                cluster_a = triplet[i]
-                cluster_b = triplet[j]
-                # trovo la similarità tra cluster_a e cluster_b nel dataframe
-                similarity_row = similarity_df[((similarity_df['context1'] == cluster_a[0]) & (
-                        similarity_df['cluster1'] == cluster_a[1]) & (similarity_df['context2'] == cluster_b[0]) & (
-                                                        similarity_df['cluster2'] == cluster_b[1])) | (
-                                                       (similarity_df['context1'] == cluster_b[0]) & (
-                                                       similarity_df['cluster1'] == cluster_b[1]) & (
-                                                               similarity_df['context2'] == cluster_a[0]) & (
-                                                               similarity_df['cluster2'] == cluster_a[1]))]
-                if not similarity_row.empty:
-                    similarities_in_triplet.append(similarity_row['similarity'].values[0])
-        return np.mean(similarities_in_triplet) if similarities_in_triplet else 0  # Return 0 if no similarities found
-
-    closest_triplets.sort(key=triplet_similarity, reverse=True)
-    return closest_triplets
-
-
 def visualize_similarity_matrix(
         similarity_df: pd.DataFrame,
         clustered_data: List[Tuple[str, pd.DataFrame]],
@@ -366,9 +252,9 @@ def visualize_similarity_matrix(
     if show_plot:
         plt.figure(figsize=(16, 14))  # Aumenta la dimensione della figura
         sns.heatmap(pivot_df, annot=True, cmap="viridis")
-        plt.title(f"Similarità tra Cluster ({metric_name} Distance)")
-        plt.xlabel("Contesto2, Cluster2")
-        plt.ylabel("Contesto1, Cluster1")
+        plt.title(f"Similarity between Clusters ({metric_name} Distance)")
+        plt.xlabel("Context2, Cluster2")
+        plt.ylabel("Context1, Cluster1")
         plt.show()
 
 
@@ -428,7 +314,6 @@ def visualize_player_trajectory(
         player: str,
         dfs_clustered: List[Tuple[str, pd.DataFrame]],  # Aggiungi il DataFrame come parametro
         cluster_col: str = 'cluster',  # Aggiungi cluster_col come parametro
-        top_features: bool = False,
 ):
     """
     Visualizza la traiettoria del giocatore utilizzando i profili dei cluster.
@@ -451,5 +336,4 @@ def visualize_player_trajectory(
         print(f"\nContext = {context_to_print}, Cluster = {cluster}")
         df = next(df for ctx, df in dfs_clustered if ctx == context)
         # Analizza il profilo del cluster
-        analyze_cluster_profiles(df, top_features=top_features, context=context_cleaned, cluster_col=cluster_col,
-                                 cluster_id=cluster)
+        analyze_cluster_profiles(df, context=context_cleaned, cluster_col=cluster_col, cluster_id=cluster)

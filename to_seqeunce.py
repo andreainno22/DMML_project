@@ -31,8 +31,6 @@ def to_sequence(point_code):
             # allora il punto non è proseguito, posso ritornare il servizio
             outcome += point_code[2]
             return [serve], outcome
-            # serve += point_code[2]
-            # start_rally_index = 3
         else:
             start_rally_index = 2
     elif point_code[1] in serve_outcomes or point_code[1] in fault_types:

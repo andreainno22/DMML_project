@@ -81,8 +81,6 @@ def get_final_datasets(df):
     return build_final_dataset(all_features_by_context)
 
 
-
-
 def build_pattern_vocabulary(all_pattern_lists):
     """
     Costruisce un vocabolario di top pattern SEPARATO per ogni contesto,
