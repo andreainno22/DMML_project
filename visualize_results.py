@@ -7,22 +7,22 @@ from sklearn.metrics import pairwise_distances
 import numpy as np
 
 cluster_description = {"on response_ on clay, cluster 0": "Defensive, consistent from the baseline.",
-                       "on response_ on clay, cluster 1": "Aggressive since the response, variety of shots, high number of net discents",
-                       "on response_ on clay, cluster 2": "High-risk, aggressive baseliner, high usage of dropshot, not good responder to the service",
-                       "on response_ on clay, cluster 3": "Excelent service responder, conservative and low error-prone, high number of net discents",
-                       "on response_ on grass, cluster 0": "High-risk, aggressive baseliner, high usage of dropshot",
-                       "on response_ on grass, cluster 1": "Defensive, consistent from the baseline, sufference in the net descents",
-                       "on response_ on grass, cluster 2": "Very good responder to the service, very good in net points but low net descents, low-risk point builder",
-                       "on response_ on grass, cluster 3": "Aggressive, low error-prone, bad service responder",
-                       "on response_ on hard, cluster 0": "Defensive, untouchable from the baseline, low error-prone, dropshots user",
-                       "on response_ on hard, cluster 1": "High-risk, aggressive baseliner, he tries to shorten the point",
-                       "on response_ on hard, cluster 2": "Aggressive but low error-prone, low usage of slice shots",
+                       "on response_ on clay, cluster 1": "Aggressive since the response, high number of net discents.",
+                       "on response_ on clay, cluster 2": "High-risk, aggressive baseliner, high shot variety.",
+                       "on response_ on clay, cluster 3": "High winners rate, high dropshot user, strong net performance",
+                       "on response_ on grass, cluster 0": "Defensive, consistent from the baseline",
+                       "on response_ on grass, cluster 1": "High winner percentage, slice user, high net points rate",
+                       "on response_ on grass, cluster 2": "High-risk, dropshot user",
+                       "on response_ on grass, cluster 3": "Aggressive, low error-prone",
+                       "on response_ on hard, cluster 0": "High winner rate, few variations",
+                       "on response_ on hard, cluster 1": "Low-risk, defensive, dropshot user",
+                       "on response_ on hard, cluster 2": "Aggressive, he aims for quick points",
                        "on response_ on hard, cluster 3": "Defensive, slice constructor, high number net discents",
-                       "on serve_ on clay, cluster 0": "Aggressive, high-risk from the baseline",
-                       "on serve_ on clay, cluster 1": "Defensive, low-risk from the baseline",
-                       "on serve_ on clay, cluster 2": "Defensive, low-risk, variety of shots",
-                       "on serve_ on clay, cluster 3": "Big server, serve and volley user",
-                       "on serve_ on grass, cluster 0":"Error-prone, not big server",
+                       "on serve_ on clay, cluster 0": "Defensive, high variations",
+                       "on serve_ on clay, cluster 1": "Big server, serve and volley user",
+                       "on serve_ on clay, cluster 2": "Defensive, low-risk",
+                       "on serve_ on clay, cluster 3": "High risk, few net points",
+                       "on serve_ on grass, cluster 0":"Good server, dropshot user",
                        "on serve_ on grass, cluster 1":"Good server, silce user, serve and volley user",
                        "on serve_ on grass, cluster 2":"Defensive, low error-prone, baseline builder",
                        "on serve_ on grass, cluster 3":"Big server, aggressive",
@@ -47,13 +47,11 @@ def aggregate_features_by_cluster(df_clustered: pd.DataFrame, cluster_col='clust
     if agg_funcs is None:
         agg_funcs = ['mean']
 
-    # Rimuovi eventuali colonne non numeriche (o adattalo se hai categoriche)
     numeric_cols = [col for col in df_clustered if col != cluster_col and col != 'player']
 
     # Group by cluster e calcolo aggregati
     grouped = df_clustered.groupby(cluster_col)[numeric_cols].agg(agg_funcs)
 
-    # Pulizia del multi-index se più funzioni
     if isinstance(agg_funcs, list) and len(agg_funcs) > 1:
         grouped.columns = ['_'.join(col) for col in grouped.columns]
 
@@ -195,7 +193,7 @@ def calculate_centroid_similarity(
                 similarity = 1 - pairwise_distances(centroid1, centroid2, metric="euclidean")[
                     0][0]
             else:
-                raise ValueError(f"Metrica non supportata: {metric}")
+                raise ValueError(f"Not supported metric: {metric}")
 
             similarity_data.append(
                 {
@@ -312,8 +310,8 @@ def display_top_player_trajectories(
 def visualize_player_trajectory(
         player_trajectories: Dict[str, List[Tuple[str, int]]],
         player: str,
-        dfs_clustered: List[Tuple[str, pd.DataFrame]],  # Aggiungi il DataFrame come parametro
-        cluster_col: str = 'cluster',  # Aggiungi cluster_col come parametro
+        dfs_clustered: List[Tuple[str, pd.DataFrame]],  
+        cluster_col: str = 'cluster',  
 ):
     """
     Visualizza la traiettoria del giocatore utilizzando i profili dei cluster.

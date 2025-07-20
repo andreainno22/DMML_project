@@ -16,11 +16,11 @@ def build_generic_features(player, context, shots):
     dropshots_codes = {'u', 'y'}
     base_context = context.split(f"{player} ", 1)[1]
 
-    # queste 3 variabili servono per gestire il filling della variabile ave_depth_response quando non presente.
-    # La logica è che viene riempita con la media del contesto. Per farlo prima bisogna tenere traccia di tutte le avg_depth_resp del
-    # contesto e alla fine fare la media per il contesto. Nel frattempo è necessario mantenere in
-    # dict_of_players_with_none_avg_resp_depth_per_context i nomi dei giocatori con la variabile nulla, che verrà
-    # riempita in build_final_dataset
+    # These 3 variables are used to manage the filling of the ave_depth_response variable when it is not present.
+    # The logic is that it is filled with the context average. To do this, you must first keep track of all the avg_depth_resp of the
+    # context and then calculate the average for the context. In the meantime, you must keep the names of the players in
+    # dict_of_players_with_none_avg_resp_depth_per_context with the null variable, which will be
+    # filled in build_final_dataset
     total_players_with_not_null_avg_resp_depth_per_context.setdefault(base_context, 0)
     avg_resp_depth_per_context.setdefault(base_context, 0)
     dict_of_players_with_none_avg_resp_depth_per_context.setdefault(base_context, [])

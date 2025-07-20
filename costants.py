@@ -1,10 +1,11 @@
-SHOT_LENGTH = 3  # Lunghezza dei colpi da considerare
+SHOT_LENGTH = 3  # Number of consecutive shots to consider
 SURFACES = ["hard", "clay", "grass"]
-MIN_NUM_OF_POINTS = 30  # Numero minimo di colpi per player per contesto per essere considerato nel clustering
-MIN_SUPPORT = 0.01  # Supporto minimo per le sequenze frequenti
-MIN_SEQUENCE_LENGTH = 3  # Lunghezza minima della sequenza
-TOP_PATTERNS = 50  # Numero di pattern frequenti inseriti nel dizionario
-MIN_PLAYERS = 3  # numero minimo di giocatori che utilizza un pattern affinchè il pattern venga considerato per essere nei top_patterns
+MIN_NUM_OF_POINTS = 30  # Minimum number of points per player per context to be included in clustering
+MIN_SUPPORT = 0.01  # Minimum support for frequent sequences
+MIN_SEQUENCE_LENGTH = 3  # Minimum sequence length
+TOP_PATTERNS = 50  # Number of frequent patterns to include in the dictionary
+MIN_PLAYERS = 3  # Minimum number of players using a pattern for it to be considered among the top patterns
+
 PLAYERS = ['Abedallah_Shelbayh', 'Adam_Walton', 'Adrian_Andreev', 'Adrian_Mannarino', 'Albert_Ramos',
            'Alejandro_Davidovich_Fokina', 'Alejandro_Moro_Canas', 'Alejandro_Tabilo', 'Aleksandar_Kovacevic',
            'Aleksandar_Vukic', 'Aleksandre_Metreveli', 'Alessandro_Giannessi', 'Alex_Barrena', 'Alex_Bolt',

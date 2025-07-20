@@ -93,16 +93,18 @@ def run_kmeans_clustering(df, n_clusters=4, visualize=True, dimensionality_reduc
 
     # Calcolo del DBI
     dbi = davies_bouldin_score(values, cluster_labels)
-    print(f"Dbi score (KMeans): {dbi:.3f}")
+    print(f"DBI score (KMeans): {dbi:.3f}")
 
-    # 5. PCA per visualizzazione
+    # 5. Visualizzazione clusters
     if visualize:
-        if dimensionality_reduction == "umap":
+        if dimensionality_reduction == "umap8":
             reducer = umap.UMAP(n_components=2)
             X_visualize = reducer.fit_transform(values)
-        else:
+        elif dimensionality_reduction == "pca" or dimensionality_reduction == "no reduction":
             pca = PCA(n_components=2)
             X_visualize = pca.fit_transform(values)
+        else:
+            X_visualize = values
             
         plt.figure(figsize=(8, 6))
         for cluster_id in range(n_clusters):
@@ -117,40 +119,68 @@ def run_kmeans_clustering(df, n_clusters=4, visualize=True, dimensionality_reduc
         plt.tight_layout()
         plt.show()
 
+    return 
+
+
+def run_kmeans_clustering_multiple(df, n_clusters=4, n_runs=50, visualize=True, dimensionality_reduction="no reduction"):
+    feature_cols = [col for col in df.columns if col not in ["player"]]
+    values = df[feature_cols].values
+
+    best_score = -np.inf
+    best_model = None
+    best_labels = None
+    best_seed = None
+
+    for seed in range(n_runs):
+        kmeans = KMeans(n_clusters=n_clusters, random_state=seed, n_init='auto')
+        cluster_labels = kmeans.fit_predict(values)
+        score = silhouette_score(values, cluster_labels)
+
+        if score > best_score:
+            best_score = score
+            best_model = kmeans
+            best_labels = cluster_labels
+            best_seed = seed
+
+    # Applica il clustering migliore
+    df_with_clusters = df.copy()
+    df_with_clusters['cluster'] = best_labels
+
+    # Valutazione finale
+    print(f"Best seed: {best_seed}")
+    print(f"Silhouette score (best): {best_score:.3f}")
+    dbi = davies_bouldin_score(values, best_labels)
+    print(f"DBI score (best): {dbi:.3f}")
+
+    # Visualizzazione del clustering migliore
+    if visualize:
+        if dimensionality_reduction == "umap8":
+            reducer = umap.UMAP(n_components=2)
+            X_visualize = reducer.fit_transform(values)
+        elif dimensionality_reduction == "pca":
+            pca = PCA(n_components=2)
+            X_visualize = pca.fit_transform(values)
+        else:
+            X_visualize = values
+
+        plt.figure(figsize=(8, 6))
+        for cluster_id in range(n_clusters):
+            idx = df_with_clusters['cluster'] == cluster_id
+            plt.scatter(X_visualize[idx, 0], X_visualize[idx, 1], label=f"Cluster {cluster_id}", alpha=0.7)
+
+        plt.title(f"KMeans Clustering (best seed={best_seed}) + {dimensionality_reduction}")
+        plt.xlabel(f"{dimensionality_reduction} 1")
+        plt.ylabel(f"{dimensionality_reduction} 2")
+        plt.legend()
+        plt.grid(True)
+        plt.tight_layout()
+        plt.show()
+
     return df_with_clusters
 
 
-def explained_variance_from_features(df):
-    # 1. Standardizza il dataset (escludi colonne non numeriche se necessario)
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(df)  # df contiene solo colonne numeriche
-
-    # 2. PCA con tutte le componenti
-    pca = PCA()
-    X_pca = pca.fit_transform(X_scaled)
-
-    # 3. Varianza spiegata per ogni componente
-    explained_var_ratio = pca.explained_variance_ratio_
-    cumulative_var = np.cumsum(explained_var_ratio)
-
-    # 4. Plot della varianza spiegata
-    plt.figure(figsize=(10, 6))
-    plt.plot(range(1, len(explained_var_ratio) + 1), cumulative_var, marker='o', linestyle='--')
-    plt.title('Varianza spiegata cumulativa dopo PCA')
-    plt.xlabel('Numero di componenti principali')
-    plt.ylabel('Varianza spiegata cumulativa')
-    plt.grid(True)
-    plt.show()
-
-    # 5. (Opzionale) Stampare le percentuali
-    for i, ratio in enumerate(explained_var_ratio, 1):
-        print(f"PC{i}: {ratio:.4f} ({cumulative_var[i - 1]:.4f} cumulativa)")
-
-
-
-
 def run_umap_gmm_clustering(df, n_clusters=4,
-                            proba_threshold=0.9, visualize=True):
+                            proba_threshold=0.9, visualize=True, umap_comp=2):
     """
     Applica UMAP per riduzione + GMM per clustering, con gestione dei punti ambigui come rumore.
 
@@ -198,11 +228,16 @@ def run_umap_gmm_clustering(df, n_clusters=4,
 
     # 6. Visualizzazione
     if visualize:
+        if umap_comp==8:
+            reducer = umap.UMAP(n_components=2)
+            X_visualize = reducer.fit_transform(values)
+        else:
+            X_visualize = values
         plt.figure(figsize=(8, 6))
         for label in np.unique(cluster_labels):
             idx = cluster_labels == label
             color = 'black' if label == -1 else None
-            plt.scatter(values[idx, 0], values[idx, 1], label=f"Cluster {label}", alpha=0.7, color=color)
+            plt.scatter(X_visualize[idx, 0], X_visualize[idx, 1], label=f"Cluster {label}", alpha=0.7, color=color)
         plt.title("Clustering UMAP + GMM")
         plt.xlabel("UMAP 1")
         plt.ylabel("UMAP 2")
@@ -217,7 +252,7 @@ def run_umap_gmm_clustering(df, n_clusters=4,
     return df_clustered
 
 
-def run_umap_agglomerative_clustering(df, n_clusters=4, linkage='ward', visualize=True):
+def run_umap_agglomerative_clustering(df, n_clusters=4, linkage='ward', visualize=True, umap_comp = 2):
     """
     Applica UMAP + Agglomerative Clustering e visualizza i risultati.
 
@@ -252,8 +287,11 @@ def run_umap_agglomerative_clustering(df, n_clusters=4, linkage='ward', visualiz
 
     # 5. Visualizzazione 2D 
     if visualize:
-        reducer_2d = umap.UMAP(n_components=2)
-        X_2d = reducer_2d.fit_transform(values)
+        if umap_comp == 8:
+            reducer_2d = umap.UMAP(n_components=2)
+            X_2d = reducer_2d.fit_transform(values)
+        else:
+            X_2d = values
         plt.figure(figsize=(8, 6))
         for label in np.unique(cluster_labels):
             idx = cluster_labels == label
@@ -273,7 +311,7 @@ def run_umap_agglomerative_clustering(df, n_clusters=4, linkage='ward', visualiz
 
 
 def run_umap_optics_clustering(df, reduction='umap', min_pts=3, xi=0.05,
-                               min_cluster_size=0.1, visualize=True, noise_perc=0.30):
+                               min_cluster_size=0.1, visualize=True, noise_perc=0.30, umap_comp = 2):
     """
     Execute dimensionality reduction and OPTICS clustering on a dataset. The function
     supports both UMAP and PCA for dimensionality reduction. It generates various
@@ -327,13 +365,15 @@ def run_umap_optics_clustering(df, reduction='umap', min_pts=3, xi=0.05,
             print("Noise points: "+ str(invalid_mask.sum())+ "\nAccepted max number of point classified as noise, based on noise percentage: " + str(df.shape[0]*(noise_perc)))
 
     if visualize:
-        if reduction == "umap":
+        if reduction == "umap" and umap_comp==8:
             # Visualizzazione 2D
             reducer_2d = umap.UMAP(n_components=2)
             X_2d = reducer_2d.fit_transform(values)
-        else:
+        elif reduction == "pca":
             pca = PCA(n_components=2)  
             X_2d = pca.fit_transform(values)
+        else:
+            X_2d = values
 
         plt.figure(figsize=(8, 6))
         for label in np.unique(cluster_labels):
